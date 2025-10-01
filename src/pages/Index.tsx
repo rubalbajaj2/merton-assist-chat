@@ -108,7 +108,7 @@ const Index = () => {
                   <FileText className="w-5 h-5" />
                   <h2 className="text-lg font-semibold">What Can I Do...</h2>
                 </div>
-                <ScrollArea className="flex-1 pr-2">
+                <div className="flex-1 overflow-y-auto pr-2">
                   <div className="space-y-3">
                     {questions.map((q, index) => (
                       <QuestionCard
@@ -120,7 +120,7 @@ const Index = () => {
                       />
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
 
               {/* Right: Chat Interface */}
