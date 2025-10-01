@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Mic, Paperclip } from "lucide-react";
+import { Send, Mic, Paperclip, MessageCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Message {
@@ -10,15 +10,27 @@ interface Message {
   content: string;
 }
 
-const ChatInterface = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Hi! I'm a Merton council agent. I'm here to help, whether that's by providing information or finding the right service for you."
-    }
-  ]);
+interface ChatInterfaceProps {
+  selectedQuestion?: string;
+  onQuestionProcessed?: () => void;
+}
+
+const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceProps) => {
+  const initialMessage: Message = {
+    id: "1",
+    role: "assistant",
+    content: "Hi! I'm a Merton council agent. I'm here to help, whether that's by providing information or finding the right service for you."
+  };
+
+  const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [input, setInput] = useState("");
+
+  useEffect(() => {
+    if (selectedQuestion) {
+      setInput(selectedQuestion);
+      onQuestionProcessed?.();
+    }
+  }, [selectedQuestion, onQuestionProcessed]);
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -49,12 +61,17 @@ const ChatInterface = () => {
     }
   };
 
+  const handleClearChat = () => {
+    setMessages([initialMessage]);
+    setInput("");
+  };
+
   return (
     <div className="flex flex-col h-full bg-card rounded-lg border border-border">
       <div className="flex items-center gap-2 p-4 border-b border-border">
-        <div className="w-2 h-2 rounded-full bg-secondary"></div>
-        <h3 className="font-semibold">Agentic AI Assistant</h3>
-        <Button variant="destructive" size="sm" className="ml-auto">
+        <MessageCircle className="w-5 h-5 text-secondary" />
+        <h3 className="font-semibold">Ask Merti...</h3>
+        <Button variant="destructive" size="sm" className="ml-auto" onClick={handleClearChat}>
           Clear Chat
         </Button>
       </div>

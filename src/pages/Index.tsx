@@ -35,6 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 const Index = () => {
   const [selectedTab, setSelectedTab] = useState("assistant");
+  const [selectedQuestion, setSelectedQuestion] = useState<string>();
 
   const features = [
     { icon: Calendar, title: "Calendar reminders" },
@@ -73,7 +74,11 @@ const Index = () => {
   ];
 
   const handleQuestionClick = (question: string) => {
-    console.log("Question clicked:", question);
+    setSelectedQuestion(question);
+  };
+
+  const handleQuestionProcessed = () => {
+    setSelectedQuestion(undefined);
   };
 
   return (
@@ -119,7 +124,10 @@ const Index = () => {
               </div>
 
               {/* Right: Chat Interface */}
-              <ChatInterface />
+              <ChatInterface 
+                selectedQuestion={selectedQuestion}
+                onQuestionProcessed={handleQuestionProcessed}
+              />
             </div>
           </TabsContent>
 
