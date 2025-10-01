@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Mic, Paperclip, MessageCircle } from "lucide-react";
+import { Send, MessageCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Message {
@@ -16,14 +16,15 @@ interface ChatInterfaceProps {
 }
 
 const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceProps) => {
-  const initialMessage: Message = {
-    id: "1",
-    role: "assistant",
-    content: "Hi! I'm a Merton council agent. I'm here to help, whether that's by providing information or finding the right service for you."
-  };
-
-  const [messages, setMessages] = useState<Message[]>([initialMessage]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      role: "assistant",
+      content: "Hi! I'm a Merton council agent. I'm here to help, whether that's by providing information or finding the right service for you."
+    }
+  ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (selectedQuestion) {
@@ -32,26 +33,65 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     }
   }, [selectedQuestion, onQuestionProcessed]);
 
-  const handleSend = () => {
+  const sendToN8n = async (message: string) => {
+    try {
+      const response = await fetch('https://merton-agent.app.n8n.cloud/webhook/b1c66984-c4cd-426a-a01b-01ac1e44514d/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message,
+          sessionId: 'merton-chat-session'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from n8n');
+      }
+
+      const data = await response.json();
+      return data.response || data.message || "I'm processing your request. How else can I help you today?";
+    } catch (error) {
+      console.error('Error calling n8n webhook:', error);
+      return "I'm processing your request. How else can I help you today?";
+    }
+  };
+
+  const handleSend = async () => {
     if (!input.trim()) return;
 
-    const newMessage: Message = {
+    const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: input
     };
 
-    setMessages([...messages, newMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInput("");
+    setIsLoading(true);
 
-    // Simulate assistant response
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
+    try {
+      const response = await sendToN8n(input);
+      
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm processing your request. How else can I help you today?"
-      }]);
-    }, 1000);
+        content: response
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm sorry, I'm having trouble processing your request right now. Please try again."
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -62,15 +102,19 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
   };
 
   const handleClearChat = () => {
-    setMessages([initialMessage]);
+    setMessages([{
+      id: "1",
+      role: "assistant",
+      content: "Hi! I'm a Merton council agent. I'm here to help, whether that's by providing information or finding the right service for you."
+    }]);
     setInput("");
   };
 
   return (
-    <div className="flex flex-col h-full bg-card rounded-lg border border-border">
-      <div className="flex items-center gap-2 p-4 border-b border-border">
+    <div className="flex flex-col h-full bg-card rounded-lg border border-border min-h-[450px]">
+      <div className="flex items-center gap-2 p-4 border-b border-border flex-shrink-0">
         <MessageCircle className="w-5 h-5 text-secondary" />
-        <h3 className="font-semibold">Ask Merti...</h3>
+        <h3 className="font-semibold text-lg">Ask Merti!</h3>
         <Button variant="destructive" size="sm" className="ml-auto" onClick={handleClearChat}>
           Clear Chat
         </Button>
@@ -94,28 +138,34 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
               </div>
             </div>
           ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-primary text-primary-foreground rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Thinking...</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
 
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Button size="icon" variant="ghost" className="flex-shrink-0">
-            <Paperclip className="w-5 h-5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="flex-shrink-0">
-            <Mic className="w-5 h-5" />
-          </Button>
           <Input
             placeholder="Type your message..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             className="flex-1"
+            disabled={isLoading}
           />
           <Button 
             size="icon" 
             className="flex-shrink-0 bg-secondary hover:bg-secondary/90"
             onClick={handleSend}
+            disabled={isLoading || !input.trim()}
           >
             <Send className="w-5 h-5" />
           </Button>

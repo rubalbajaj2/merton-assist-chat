@@ -82,33 +82,36 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Header />
       
-      <div className="container mx-auto flex-1 py-6 px-6">
+      <div className="container mx-auto flex-1 py-6 px-6 overflow-hidden">
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-6">
+          <TabsList className="grid w-full max-w-lg mx-auto grid-cols-3 mb-6">
             <TabsTrigger value="assistant">Agentic AI Assistant</TabsTrigger>
             <TabsTrigger value="reports">Recent Reports</TabsTrigger>
+            <TabsTrigger value="admin">Admin Login</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="assistant" className="space-y-6">
+          <TabsContent value="assistant" className="flex flex-col flex-1 overflow-hidden">
             {/* Features Section */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               {features.map((feature, index) => (
                 <FeatureCard key={index} icon={feature.icon} title={feature.title} />
               ))}
             </div>
 
-            {/* Main Content Area */}
-            <div className="grid md:grid-cols-[350px_1fr] gap-6 h-[calc(100vh-380px)]">
+            {/* Main Content Area - Side by Side */}
+            <div className="grid md:grid-cols-[350px_1fr] gap-6 h-[500px]">
               {/* Left: Questions Sidebar */}
-              <div className="bg-card rounded-lg border border-border p-4 flex flex-col h-full">
+              <div className="bg-card rounded-lg border border-border p-4 flex flex-col h-[450px] min-h-0">
                 <div className="flex items-center gap-2 mb-4">
                   <FileText className="w-5 h-5" />
                   <h2 className="text-lg font-semibold">What Can I Do...</h2>
                 </div>
-                <div className="flex-1 overflow-y-auto pr-2">
+                
+                {/* Scrollable Window for Questions */}
+                <div className="bg-background rounded-lg border border-border p-3 flex-1 overflow-y-scroll min-h-0">
                   <div className="space-y-3">
                     {questions.map((q, index) => (
                       <QuestionCard
@@ -124,10 +127,12 @@ const Index = () => {
               </div>
 
               {/* Right: Chat Interface */}
-              <ChatInterface 
-                selectedQuestion={selectedQuestion}
-                onQuestionProcessed={handleQuestionProcessed}
-              />
+              <div className="h-[450px] flex flex-col">
+                <ChatInterface 
+                  selectedQuestion={selectedQuestion}
+                  onQuestionProcessed={handleQuestionProcessed}
+                />
+              </div>
             </div>
           </TabsContent>
 
@@ -135,6 +140,13 @@ const Index = () => {
             <div className="text-center py-12 text-muted-foreground">
               <FileCheck className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg">Recent reports will appear here</p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="admin" className="space-y-4">
+            <div className="text-center py-12 text-muted-foreground">
+              <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg">Admin login functionality will appear here</p>
             </div>
           </TabsContent>
         </Tabs>
