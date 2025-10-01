@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, MessageCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { N8nWebhookService, N8nChatMessage } from "@/services/n8n-webhook-service";
 
 interface Message {
   id: string;
@@ -26,37 +27,25 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Initialize n8n chat session
+  useEffect(() => {
+    const initChat = async () => {
+      try {
+        await N8nWebhookService.initializeChat();
+        console.log('✅ n8n chat session initialized');
+      } catch (error) {
+        console.error('Failed to initialize chat session:', error);
+      }
+    };
+    initChat();
+  }, []);
+
   useEffect(() => {
     if (selectedQuestion) {
       setInput(selectedQuestion);
       onQuestionProcessed?.();
     }
   }, [selectedQuestion, onQuestionProcessed]);
-
-  const sendToN8n = async (message: string) => {
-    try {
-      const response = await fetch('https://merton-agent.app.n8n.cloud/webhook/b1c66984-c4cd-426a-a01b-01ac1e44514d/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: message,
-          sessionId: 'merton-chat-session'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from n8n');
-      }
-
-      const data = await response.json();
-      return data.response || data.message || "I'm processing your request. How else can I help you today?";
-    } catch (error) {
-      console.error('Error calling n8n webhook:', error);
-      return "I'm processing your request. How else can I help you today?";
-    }
-  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -72,15 +61,18 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     setIsLoading(true);
 
     try {
-      const response = await sendToN8n(input);
+      console.log('📤 Sending message via n8n service:', userMessage.content);
+      const response = await N8nWebhookService.sendMessage(userMessage.content);
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: response
+        content: response.message
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      console.log('📥 Received response:', response.message);
+
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
@@ -108,6 +100,13 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
       content: "Hi! I'm a Merton council agent. I'm here to help, whether that's by providing information or finding the right service for you."
     }]);
     setInput("");
+    
+    // Reset n8n session
+    N8nWebhookService.resetSession().then(() => {
+      console.log('🔄 n8n session reset');
+    }).catch(error => {
+      console.error('Failed to reset session:', error);
+    });
   };
 
   return (
