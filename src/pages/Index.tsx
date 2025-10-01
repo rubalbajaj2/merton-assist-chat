@@ -103,12 +103,12 @@ const Index = () => {
             {/* Main Content Area */}
             <div className="grid md:grid-cols-[350px_1fr] gap-6 h-[calc(100vh-380px)]">
               {/* Left: Questions Sidebar */}
-              <div className="space-y-4">
+              <div className="bg-card rounded-lg border border-border p-4 flex flex-col h-full">
                 <div className="flex items-center gap-2 mb-4">
                   <FileText className="w-5 h-5" />
                   <h2 className="text-lg font-semibold">What Can I Do...</h2>
                 </div>
-                <ScrollArea className="h-full pr-4">
+                <ScrollArea className="flex-1 pr-2">
                   <div className="space-y-3">
                     {questions.map((q, index) => (
                       <QuestionCard
