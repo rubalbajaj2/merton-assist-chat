@@ -1,4 +1,16 @@
-import { supabase, Request, DashboardStats } from '@/lib/supabase'
+import { supabase } from '@/integrations/supabase/client'
+import type { Tables } from '@/integrations/supabase/types'
+
+// Use proper types from the new integration
+type Request = Tables<'requests'>
+
+// Dashboard stats interface
+export interface DashboardStats {
+  totalRequests: number
+  requestsByType: { type: string; count: number }[]
+  requestsByAddedBy: { addedby: string; count: number }[]
+  recentRequests: Request[]
+}
 
 export class RequestsService {
   /**

@@ -7,8 +7,10 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { RequestsService } from '@/services/requests-service'
-import { Request } from '@/lib/supabase'
+import type { Tables } from '@/integrations/supabase/types'
 import IssueCard from '@/components/IssueCard'
+
+type Request = Tables<'requests'>
 
 const RecentReports = () => {
   const [issueRequests, setIssueRequests] = useState<Request[]>([])

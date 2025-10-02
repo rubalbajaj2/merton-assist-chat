@@ -9,7 +9,9 @@ import {
   AlertCircle,
   FileText
 } from 'lucide-react'
-import { Request } from '@/lib/supabase'
+import type { Tables } from '@/integrations/supabase/types'
+
+type Request = Tables<'requests'>
 
 interface IssueCardProps {
   request: Request

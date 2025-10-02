@@ -8,8 +8,7 @@ import {
   AlertCircle,
   BarChart3
 } from 'lucide-react'
-import { RequestsService } from '@/services/requests-service'
-import { DashboardStats, Request } from '@/lib/supabase'
+import { RequestsService, DashboardStats } from '@/services/requests-service'
 
 interface DashboardProps {
   onRefresh?: () => void
