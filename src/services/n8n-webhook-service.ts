@@ -13,6 +13,7 @@ export interface N8nResponse {
 
 export class N8nWebhookService {
   private static readonly WEBHOOK_URL = 'https://merton-agent.app.n8n.cloud/webhook/b1c66984-c4cd-426a-a01b-01ac1e44514d/chat';
+  private static readonly SCRAPING_WEBHOOK_URL = 'https://merton-agent.app.n8n.cloud/webhook/fc782015-0ef9-433e-9fb2-e16073658b3c/chat';
   private static sessionId: string | null = null;
   private static isInitializing: boolean = false;
 
@@ -186,5 +187,51 @@ export class N8nWebhookService {
     this.sessionId = null;
     this.isInitializing = false;
     return await this.initializeChat();
+  }
+
+  /**
+   * Send URL to n8n for scraping
+   */
+  static async scrapeUrl(url: string): Promise<N8nResponse> {
+    try {
+      console.log('🔄 Sending URL to n8n for scraping:', url);
+      
+      const response = await fetch(this.SCRAPING_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatInput: url,
+          sessionId: this.sessionId,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseText = await response.text();
+      console.log('📝 Raw response from n8n scraping:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('✅ Parsed n8n scraping response:', data);
+      } catch (jsonError) {
+        console.log('⚠️ JSON parsing failed for scraping response:', jsonError);
+        data = { message: 'Scraping initiated successfully', success: true };
+      }
+      
+      return {
+        message: data.message || 'URL sent for scraping',
+        sessionId: data.sessionId || null,
+        metadata: data
+      };
+    } catch (error) {
+      console.error('❌ Error calling n8n scraping webhook:', error);
+      throw new Error(`Failed to send URL for scraping: ${error}`);
+    }
   }
 }

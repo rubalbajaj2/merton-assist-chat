@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,10 +13,17 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
-  Trash2
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  File,
+  Upload
 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { supabase } from '@/integrations/supabase/client'
+import { ScrapingService, ScrapingResult } from '@/services/scraping-service'
+import { DocumentsService, DocumentWithMetadata } from '@/services/documents-service'
+import { N8nWebhookService } from '@/services/n8n-webhook-service'
 
 const KnowledgeBase = () => {
   const [activeTab, setActiveTab] = useState('page-content')
@@ -24,32 +31,200 @@ const KnowledgeBase = () => {
   const [urlInput, setUrlInput] = useState('')
   const [isScraping, setIsScraping] = useState(false)
   const [scrapedPages, setScrapedPages] = useState<string[]>([])
+  const [scrapedLinks, setScrapedLinks] = useState<Array<{
+    url: string;
+    title: string;
+    content: string;
+    expanded: boolean;
+  }>>([])
+  const [scrapedFiles, setScrapedFiles] = useState<Array<{
+    url: string;
+    filename: string;
+    type: 'pdf' | 'csv' | 'xlsx';
+  }>>([])
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{
+    name: string;
+    size: number;
+    type: 'pdf' | 'csv' | 'xlsx';
+    url: string;
+  }>>([])
+  const [databaseDocuments, setDatabaseDocuments] = useState<DocumentWithMetadata[]>([])
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(true)
   const { toast } = useToast()
+
+  // Load existing documents from Supabase on component mount
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        setIsLoadingDocuments(true)
+        console.log('🔄 Loading documents from Supabase...')
+        
+        const documents = await DocumentsService.getAllDocuments()
+        setDatabaseDocuments(documents)
+        
+        // Extract page links from database documents
+        const pageLinks = DocumentsService.getPageLinks(documents)
+        const pageLinksWithExpanded = pageLinks.map(link => ({
+          ...link,
+          expanded: false
+        }))
+        setScrapedLinks(pageLinksWithExpanded)
+        
+        // Extract file links from database documents
+        const fileLinks = DocumentsService.getFileLinks(documents)
+        setScrapedFiles(fileLinks)
+        
+        // Extract unique page URLs for the pages count
+        const uniqueLinks = DocumentsService.extractUniqueLinks(documents)
+        const pageUrls = uniqueLinks.filter(url => !DocumentsService.getFileType(url))
+        setScrapedPages(pageUrls)
+        
+        console.log('✅ Loaded documents from Supabase:', {
+          totalDocuments: documents.length,
+          pageLinks: pageLinks.length,
+          fileLinks: fileLinks.length,
+          uniquePages: pageUrls.length
+        })
+        
+      } catch (error) {
+        console.error('❌ Failed to load documents from Supabase:', error)
+        toast({
+          title: "Database Connection Error",
+          description: "Failed to load existing documents. You can still add new content.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingDocuments(false)
+      }
+    }
+
+    loadDocuments()
+  }, [toast])
 
   const summaryCards = [
     {
       title: 'Pages',
       value: scrapedPages.length.toString(),
-      link: 'Click to view',
       icon: Monitor,
       bgColor: 'bg-green-500'
     },
     {
-      title: 'All Files',
-      value: '0',
-      link: 'Click to analyse',
+      title: 'Files',
+      value: (scrapedFiles.length + uploadedFiles.length).toString(),
       icon: FileText,
       bgColor: 'bg-green-500'
     }
   ]
 
   const tabs = [
-    { id: 'page-content', label: 'Page Content' },
+    { id: 'page-content', label: 'Pages' },
     { id: 'files', label: 'Files' }
   ]
 
   const handleAddPage = () => {
     setIsDialogOpen(true)
+  }
+
+  const getFileType = (url: string): 'pdf' | 'csv' | 'xlsx' | null => {
+    const extension = url.toLowerCase().split('.').pop();
+    if (extension === 'pdf') return 'pdf';
+    if (extension === 'csv') return 'csv';
+    if (extension === 'xlsx') return 'xlsx';
+    return null;
+  }
+
+  const isValidFileType = (file: File): boolean => {
+    const validTypes = ['application/pdf', 'text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+    return validTypes.includes(file.type);
+  }
+
+  const getFileTypeFromFile = (file: File): 'pdf' | 'csv' | 'xlsx' => {
+    if (file.type === 'application/pdf') return 'pdf';
+    if (file.type === 'text/csv') return 'csv';
+    if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'xlsx';
+    return 'pdf'; // fallback
+  }
+
+  const decodeFilename = (filename: string): string => {
+    try {
+      // Decode URL-encoded characters
+      const decoded = decodeURIComponent(filename);
+      
+      // Replace common URL-encoded characters with readable equivalents
+      return decoded
+        .replace(/%20/g, ' ')           // Spaces
+        .replace(/%2D/g, '-')           // Hyphens
+        .replace(/%2E/g, '.')           // Dots
+        .replace(/%5F/g, '_')           // Underscores
+        .replace(/%28/g, '(')           // Opening parenthesis
+        .replace(/%29/g, ')')           // Closing parenthesis
+        .replace(/%2C/g, ',')           // Commas
+        .replace(/%3A/g, ':')           // Colons
+        .replace(/%2B/g, '+')           // Plus signs
+        .replace(/%26/g, '&')           // Ampersands
+        .replace(/%3D/g, '=')           // Equals signs
+        .replace(/%3F/g, '?')           // Question marks
+        .replace(/%23/g, '#')           // Hash symbols
+        .replace(/%40/g, '@')           // At symbols
+        .replace(/%21/g, '!')           // Exclamation marks
+        .replace(/%24/g, '$')           // Dollar signs
+        .replace(/%25/g, '%')           // Percent signs
+        .replace(/%5B/g, '[')           // Opening brackets
+        .replace(/%5D/g, ']')           // Closing brackets
+        .replace(/%7B/g, '{')           // Opening braces
+        .replace(/%7D/g, '}')           // Closing braces
+        .replace(/%7C/g, '|')           // Pipes
+        .replace(/%5C/g, '\\')          // Backslashes
+        .replace(/%2F/g, '/')           // Forward slashes
+        .replace(/%3C/g, '<')           // Less than
+        .replace(/%3E/g, '>')           // Greater than
+        .replace(/%22/g, '"')           // Double quotes
+        .replace(/%27/g, "'")           // Single quotes
+        .replace(/%60/g, '`')           // Backticks
+        .replace(/%5E/g, '^')           // Carets
+        .replace(/%7E/g, '~');          // Tildes
+    } catch (error) {
+      console.warn('Failed to decode filename:', filename, error);
+      return filename; // Return original if decoding fails
+    }
+  }
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const validFiles = Array.from(files).filter(isValidFileType);
+    
+    if (validFiles.length !== files.length) {
+      toast({
+        title: "Invalid File Types",
+        description: "Only PDF, CSV, and XLSX files are allowed.",
+        variant: "destructive",
+      });
+    }
+
+    validFiles.forEach(file => {
+      const fileUrl = URL.createObjectURL(file);
+      setUploadedFiles(prev => [...prev, {
+        name: file.name,
+        size: file.size,
+        type: getFileTypeFromFile(file),
+        url: fileUrl
+      }]);
+    });
+
+    if (validFiles.length > 0) {
+      toast({
+        title: "Files Uploaded",
+        description: `${validFiles.length} file(s) uploaded successfully.`,
+      });
+    }
+  }
+
+  const toggleLinkExpansion = (index: number) => {
+    setScrapedLinks(prev => prev.map((link, i) => 
+      i === index ? { ...link, expanded: !link.expanded } : link
+    ));
   }
 
   const handleCancel = () => {
@@ -61,18 +236,10 @@ const KnowledgeBase = () => {
     try {
       console.log('🗑️ Deleting documents from Supabase for URL:', urlToDelete);
       
-      // Delete documents where metadata.link matches the URL
-      const { data, error } = await supabase
-        .from('documents')
-        .delete()
-        .contains('metadata', { link: urlToDelete });
+      // Use the documents service to delete
+      await DocumentsService.deleteDocumentsByLink(urlToDelete);
 
-      if (error) {
-        console.error('❌ Error deleting documents from Supabase:', error);
-        throw error;
-      }
-
-      console.log('✅ Successfully deleted documents from Supabase:', data);
+      console.log('✅ Successfully deleted documents from Supabase');
       return true;
     } catch (error) {
       console.error('❌ Failed to delete documents from Supabase:', error);
@@ -90,8 +257,10 @@ const KnowledgeBase = () => {
         // Delete from Supabase first
         await deleteDocumentsFromSupabase(urlToDelete);
         
-        // Then remove from local state
+        // Remove from all relevant state arrays
         setScrapedPages(prev => prev.filter(url => url !== urlToDelete));
+        setScrapedLinks(prev => prev.filter(link => link.url !== urlToDelete));
+        setScrapedFiles(prev => prev.filter(file => file.url !== urlToDelete));
         
         toast({
           title: "URL Deleted Successfully",
@@ -107,7 +276,11 @@ const KnowledgeBase = () => {
         );
         
         if (proceedLocally) {
+          // Remove from all local state arrays
           setScrapedPages(prev => prev.filter(url => url !== urlToDelete));
+          setScrapedLinks(prev => prev.filter(link => link.url !== urlToDelete));
+          setScrapedFiles(prev => prev.filter(file => file.url !== urlToDelete));
+          
           toast({
             title: "URL Deleted Locally",
             description: "URL removed from local knowledge base (database deletion failed).",
@@ -144,55 +317,72 @@ const KnowledgeBase = () => {
       return;
     }
 
+    // Validate URL
+    const isValidUrl = await ScrapingService.validateUrl(urlInput);
+    if (!isValidUrl) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid HTTP or HTTPS URL.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsScraping(true)
     try {
-      console.log('🔄 Attempting to scrape URL:', urlInput);
+      console.log('🔄 Starting to scrape URL:', urlInput);
       
-      // Use the working payload format (chat input format)
-      const payload = {
-        chatInput: urlInput,
-        sessionId: `scrape_${Date.now()}`,
-        timestamp: new Date().toISOString()
-      };
-
-      console.log('📤 Sending payload:', payload);
-      
-      const response = await fetch('https://merton-agent.app.n8n.cloud/webhook/fc782015-0ef9-433e-9fb2-e16073658b3c/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      console.log(`📊 Response status: ${response.status}`);
-      
-      if (response.ok) {
-        console.log('✅ URL scraped successfully');
-        
-        // Add URL to scraped pages
-        setScrapedPages(prev => [...prev, urlInput]);
-        
-        toast({
-          title: "Page Added Successfully",
-          description: "The URL has been added to your knowledge base.",
-        });
-        
-        // Close dialog and reset form
-        setIsDialogOpen(false)
-        setUrlInput('')
-      } else {
-        const errorText = await response.text();
-        console.log(`❌ Scraping failed with status ${response.status}:`, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      // Send URL to n8n for processing
+      try {
+        const n8nResponse = await N8nWebhookService.scrapeUrl(urlInput);
+        console.log('✅ URL sent to n8n for scraping:', n8nResponse);
+      } catch (n8nError) {
+        console.warn('⚠️ Failed to send URL to n8n, continuing with local scraping:', n8nError);
       }
-
-    } catch (error) {
-      console.error('❌ Error sending URL to webhook:', error)
       
-      // Show user option to add URL locally even if webhook fails
+      // Use local scraping service for immediate UI updates
+      const result: ScrapingResult = await ScrapingService.scrapeWebsite(urlInput);
+      
+      console.log('✅ Local scraping completed:', result);
+      
+      // Process the main page as a link
+      const mainPageLink = {
+        url: result.mainUrl,
+        title: result.title,
+        content: result.content,
+        expanded: false
+      };
+      
+      // Add only the main page to scraped links (not discovered links)
+      setScrapedLinks(prev => [...prev, mainPageLink]);
+      
+      // Add files to scraped files (keep file discovery)
+      const newFiles = result.files.map(file => ({
+        url: file.url,
+        filename: file.url.split('/').pop() || 'Unknown',
+        type: file.fileType!
+      }));
+      
+      setScrapedFiles(prev => [...prev, ...newFiles]);
+      
+      // Add URL to scraped pages
+      setScrapedPages(prev => [...prev, urlInput]);
+      
+      toast({
+        title: "Page Scraped Successfully",
+        description: `Page added to knowledge base. Found ${result.files.length} files. URL also sent to n8n for processing.`,
+      });
+      
+      // Close dialog and reset form
+      setIsDialogOpen(false)
+      setUrlInput('')
+      
+    } catch (error) {
+      console.error('❌ Error scraping website:', error)
+      
+      // Show user option to add URL locally even if scraping fails
       const shouldAddLocally = window.confirm(
-        `Failed to scrape the page via webhook: ${error.message}\n\n` +
+        `Failed to scrape the page: ${error.message}\n\n` +
         'Would you like to add this URL to your knowledge base anyway? ' +
         'You can try scraping it again later.'
       );
@@ -201,9 +391,19 @@ const KnowledgeBase = () => {
         // Add URL to scraped pages locally
         setScrapedPages(prev => [...prev, urlInput]);
         
+        // Create a basic link entry
+        const basicLink = {
+          url: urlInput,
+          title: urlInput.split('/').pop() || urlInput,
+          content: 'Content could not be scraped. Click to view the page.',
+          expanded: false
+        };
+        
+        setScrapedLinks(prev => [...prev, basicLink]);
+        
         toast({
           title: "URL Added Locally",
-          description: "URL added to knowledge base (webhook failed). You can try scraping again later.",
+          description: "URL added to knowledge base (scraping failed). You can try scraping again later.",
           variant: "default",
         });
         
@@ -223,7 +423,7 @@ const KnowledgeBase = () => {
   }
 
   return (
-    <div className="h-full flex flex-col p-6 bg-white">
+    <div className="h-full flex flex-col p-6 bg-white overflow-y-auto">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         {summaryCards.map((card, index) => (
@@ -236,9 +436,6 @@ const KnowledgeBase = () => {
                 <div className="flex-1">
                   <h3 className="text-sm font-medium text-gray-600">{card.title}</h3>
                   <p className="text-2xl font-bold text-gray-900">{card.value}</p>
-                  <p className="text-xs text-blue-600 cursor-pointer hover:underline">
-                    {card.link}
-                  </p>
                 </div>
               </div>
             </CardContent>
@@ -265,12 +462,12 @@ const KnowledgeBase = () => {
         </TabsList>
 
         {/* Content Area */}
-        <div className="flex-1">
+        <div className="flex-1 overflow-y-auto">
           <TabsContent value="page-content" className="h-full">
             <div className="h-full flex flex-col">
               {/* Header with Add Page Button */}
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Page Content</h2>
+                <h2 className="text-xl font-bold text-gray-900">Pages</h2>
                 <Button 
                   onClick={handleAddPage}
                   className="bg-green-500 hover:bg-green-600 text-white rounded-lg"
@@ -281,36 +478,70 @@ const KnowledgeBase = () => {
               </div>
 
               {/* Main Content Box */}
-              <Card className="flex-1 border border-gray-200">
+              <Card className="flex-1 border border-gray-200 overflow-y-auto">
                 <CardContent className="h-full p-4">
-                  {scrapedPages.length === 0 ? (
+                  {isLoadingDocuments ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
+                        <p className="text-gray-500 text-lg">
+                          Loading documents from database...
+                        </p>
+                      </div>
+                    </div>
+                  ) : scrapedLinks.length === 0 ? (
                     <div className="h-full flex items-center justify-center">
                       <div className="text-center">
                         <p className="text-gray-500 text-lg">
-                          No content scraped yet. Start scraping to see data here.
+                          No pages found. Start scraping to see data here.
                         </p>
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {scrapedPages.map((pageUrl, index) => (
-                        <Card key={index} className="p-3 flex items-center justify-between shadow-sm">
-                          <a 
-                            href={pageUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-blue-600 hover:underline truncate flex-1"
-                          >
-                            {pageUrl}
-                          </a>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUrl(pageUrl)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 ml-2 flex-shrink-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                      {scrapedLinks.map((link, index) => (
+                        <Card key={index} className="shadow-sm">
+                          <div className="p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleLinkExpansion(index)}
+                                className="p-1"
+                              >
+                                {link.expanded ? (
+                                  <ChevronDown className="w-4 h-4" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4" />
+                                )}
+                              </Button>
+                              <a 
+                                href={link.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-blue-600 hover:underline truncate flex-1"
+                              >
+                                {link.title}
+                              </a>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteUrl(link.url)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 ml-2 flex-shrink-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          {link.expanded && (
+                            <div className="px-3 pb-3 border-t border-gray-100">
+                              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
+                                  {link.content}
+                                </pre>
+                              </div>
+                            </div>
+                          )}
                         </Card>
                       ))}
                     </div>
@@ -324,18 +555,100 @@ const KnowledgeBase = () => {
             <div className="h-full flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Files</h2>
-                <Button className="bg-green-500 hover:bg-green-600 text-white rounded-lg">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add File
-                </Button>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    multiple
+                    accept=".pdf,.csv,.xlsx"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <Button 
+                    className="bg-green-500 hover:bg-green-600 text-white rounded-lg"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Add File
+                  </Button>
+                </div>
               </div>
-              <Card className="flex-1 border border-gray-200">
-                <CardContent className="h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-gray-500 text-lg">
-                      No files uploaded yet. Upload files to see them here.
-                    </p>
-                  </div>
+              <Card className="flex-1 border border-gray-200 overflow-y-auto">
+                <CardContent className="h-full p-4">
+                  {isLoadingDocuments ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
+                        <p className="text-gray-500 text-lg">
+                          Loading files from database...
+                        </p>
+                      </div>
+                    </div>
+                  ) : (scrapedFiles.length === 0 && uploadedFiles.length === 0) ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center">
+                        <p className="text-gray-500 text-lg">
+                          No files available. Upload files or scrape pages to see files here.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Scraped Files */}
+                      {scrapedFiles.map((file, index) => (
+                        <Card key={`scraped-${index}`} className="p-3 flex items-center justify-between shadow-sm">
+                          <div className="flex items-center gap-3 flex-1">
+                            <File className="w-5 h-5 text-blue-500" />
+                            <div className="flex-1">
+                              <a 
+                                href={file.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-blue-600 hover:underline font-medium"
+                              >
+                                {decodeFilename(file.filename)}
+                              </a>
+                              <p className="text-sm text-gray-500 capitalize">{file.type.toUpperCase()}</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteUrl(file.url)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </Card>
+                      ))}
+                      
+                      {/* Uploaded Files */}
+                      {uploadedFiles.map((file, index) => (
+                        <Card key={`uploaded-${index}`} className="p-3 flex items-center justify-between shadow-sm">
+                          <div className="flex items-center gap-3 flex-1">
+                            <File className="w-5 h-5 text-green-500" />
+                            <div className="flex-1">
+                              <span className="text-gray-900 font-medium">{decodeFilename(file.name)}</span>
+                              <p className="text-sm text-gray-500">
+                                {file.type.toUpperCase()} • {(file.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+                              URL.revokeObjectURL(file.url);
+                            }}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
