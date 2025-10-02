@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   Monitor, 
   FileText, 
@@ -26,7 +25,7 @@ import { DocumentsService, DocumentWithMetadata } from '@/services/documents-ser
 import { N8nWebhookService } from '@/services/n8n-webhook-service'
 
 const KnowledgeBase = () => {
-  const [activeTab, setActiveTab] = useState('page-content')
+  const [activeView, setActiveView] = useState('pages') // New state for active view
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [urlInput, setUrlInput] = useState('')
   const [isScraping, setIsScraping] = useState(false)
@@ -47,6 +46,11 @@ const KnowledgeBase = () => {
     size: number;
     type: 'pdf' | 'csv' | 'xlsx';
     url: string;
+  }>>([])
+  const [filesAddedToKnowledgeBase, setFilesAddedToKnowledgeBase] = useState<Array<{
+    url: string;
+    filename: string;
+    type: 'pdf' | 'csv' | 'xlsx';
   }>>([])
   const [databaseDocuments, setDatabaseDocuments] = useState<DocumentWithMetadata[]>([])
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true)
@@ -74,6 +78,10 @@ const KnowledgeBase = () => {
         const fileLinks = DocumentsService.getFileLinks(documents)
         setScrapedFiles(fileLinks)
         
+        // Extract files that are already in the knowledge base (from database)
+        const addedFiles = DocumentsService.getFileLinks(documents)
+        setFilesAddedToKnowledgeBase(addedFiles)
+        
         // Extract unique page URLs for the pages count
         const uniqueLinks = DocumentsService.extractUniqueLinks(documents)
         const pageUrls = uniqueLinks.filter(url => !DocumentsService.getFileType(url))
@@ -83,6 +91,7 @@ const KnowledgeBase = () => {
           totalDocuments: documents.length,
           pageLinks: pageLinks.length,
           fileLinks: fileLinks.length,
+          addedFiles: addedFiles.length,
           uniquePages: pageUrls.length
         })
         
@@ -103,22 +112,29 @@ const KnowledgeBase = () => {
 
   const summaryCards = [
     {
+      id: 'pages',
       title: 'Pages',
       value: scrapedPages.length.toString(),
       icon: Monitor,
-      bgColor: 'bg-green-500'
+      bgColor: 'bg-green-500',
+      onClick: () => setActiveView('pages')
     },
     {
+      id: 'files',
       title: 'Files',
+      value: filesAddedToKnowledgeBase.length.toString(),
+      icon: FileText,
+      bgColor: 'bg-green-500',
+      onClick: () => setActiveView('files')
+    },
+    {
+      id: 'files-found',
+      title: 'Files Found',
       value: (scrapedFiles.length + uploadedFiles.length).toString(),
       icon: FileText,
-      bgColor: 'bg-green-500'
+      bgColor: 'bg-blue-500',
+      onClick: () => setActiveView('files-found')
     }
-  ]
-
-  const tabs = [
-    { id: 'page-content', label: 'Pages' },
-    { id: 'files', label: 'Files' }
   ]
 
   const handleAddPage = () => {
@@ -225,6 +241,85 @@ const KnowledgeBase = () => {
     setScrapedLinks(prev => prev.map((link, i) => 
       i === index ? { ...link, expanded: !link.expanded } : link
     ));
+  }
+
+  const handleAddFileToKnowledgeBase = async (file: { url: string; filename: string; type: 'pdf' | 'csv' | 'xlsx' }) => {
+    try {
+      console.log('🔄 Adding file to knowledge base:', file.url);
+      
+      // Send file URL to n8n using the scraping webhook
+      const n8nResponse = await N8nWebhookService.scrapeUrl(file.url);
+      console.log('✅ File URL sent to n8n:', n8nResponse);
+      
+      // Add to knowledge base state
+      setFilesAddedToKnowledgeBase(prev => [...prev, file]);
+      
+      // Remove from scraped files if it exists there
+      setScrapedFiles(prev => prev.filter(f => f.url !== file.url));
+      
+      // Remove from uploaded files if it exists there
+      setUploadedFiles(prev => prev.filter(f => f.url !== file.url));
+      
+      toast({
+        title: "File Added to Knowledge Base",
+        description: `${decodeFilename(file.filename)} has been added to your knowledge base.`,
+      });
+      
+    } catch (error) {
+      console.error('❌ Error adding file to knowledge base:', error);
+      
+      toast({
+        title: "Failed to Add File",
+        description: `Failed to add ${decodeFilename(file.filename)} to knowledge base. Please try again.`,
+        variant: "destructive",
+      });
+    }
+  }
+
+  const handleDeleteFileFromKnowledgeBase = async (fileToDelete: { url: string; filename: string; type: 'pdf' | 'csv' | 'xlsx' }) => {
+    const shouldDelete = window.confirm(
+      `Are you sure you want to delete this file from your knowledge base?\n\n${decodeFilename(fileToDelete.filename)}\n\nThis will remove all related documents and embeddings from the database.`
+    );
+    
+    if (shouldDelete) {
+      try {
+        // Delete from Supabase first
+        await DocumentsService.deleteDocumentsByLink(fileToDelete.url);
+        
+        // Remove from local state
+        setFilesAddedToKnowledgeBase(prev => prev.filter(file => file.url !== fileToDelete.url));
+        
+        toast({
+          title: "File Deleted Successfully",
+          description: `${decodeFilename(fileToDelete.filename)} has been removed from your knowledge base.`,
+        });
+      } catch (error) {
+        console.error('❌ Error during file deletion:', error);
+        
+        // Ask user if they want to proceed with local deletion only
+        const proceedLocally = window.confirm(
+          `Failed to delete file from database: ${error.message}\n\n` +
+          'Would you like to remove the file from your local knowledge base anyway?'
+        );
+        
+        if (proceedLocally) {
+          // Remove from local state only
+          setFilesAddedToKnowledgeBase(prev => prev.filter(file => file.url !== fileToDelete.url));
+          
+          toast({
+            title: "File Deleted Locally",
+            description: "File removed from local knowledge base (database deletion failed).",
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "Deletion Cancelled",
+            description: "File deletion was cancelled due to database error.",
+            variant: "destructive",
+          });
+        }
+      }
+    }
   }
 
   const handleCancel = () => {
@@ -425,9 +520,15 @@ const KnowledgeBase = () => {
   return (
     <div className="h-full flex flex-col p-6 bg-white overflow-y-auto">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        {summaryCards.map((card, index) => (
-          <Card key={index} className="bg-gray-50 shadow-sm">
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {summaryCards.map((card) => (
+          <Card 
+            key={card.id} 
+            className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 bg-gray-50 shadow-sm ${
+              activeView === card.id ? 'ring-2 ring-blue-500 shadow-lg' : ''
+            }`}
+            onClick={card.onClick}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className={`w-12 h-12 ${card.bgColor} rounded-full flex items-center justify-center`}>
@@ -443,219 +544,259 @@ const KnowledgeBase = () => {
         ))}
       </div>
 
-      {/* Tabbed Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          {tabs.map((tab) => (
-            <TabsTrigger 
-              key={tab.id} 
-              value={tab.id}
-              className={`${
-                activeTab === tab.id 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-white text-gray-500'
-              }`}
-            >
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {/* Content Area */}
+      <div className="flex-1">
+        {activeView === 'pages' && (
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Pages</h2>
+              <Button 
+                className="bg-green-500 hover:bg-green-600 text-white rounded-lg"
+                onClick={handleAddPage}
+              >
+                <Globe className="w-4 h-4 mr-2" />
+                Add Page
+              </Button>
+            </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          <TabsContent value="page-content" className="h-full">
-            <div className="h-full flex flex-col">
-              {/* Header with Add Page Button */}
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Pages</h2>
-                <Button 
-                  onClick={handleAddPage}
-                  className="bg-green-500 hover:bg-green-600 text-white rounded-lg"
-                >
-                  <Globe className="w-4 h-4 mr-2" />
-                  Add Page
-                </Button>
-              </div>
-
-              {/* Main Content Box */}
-              <Card className="flex-1 border border-gray-200 overflow-y-auto">
-                <CardContent className="h-full p-4">
-                  {isLoadingDocuments ? (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
-                        <p className="text-gray-500 text-lg">
-                          Loading documents from database...
-                        </p>
-                      </div>
+            {/* Main Content Box */}
+            <Card className="flex-1 border border-gray-200 overflow-y-auto">
+              <CardContent className="h-full p-4">
+                {isLoadingDocuments ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
+                      <p className="text-gray-500 text-lg">
+                        Loading documents from database...
+                      </p>
                     </div>
-                  ) : scrapedLinks.length === 0 ? (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <p className="text-gray-500 text-lg">
-                          No pages found. Start scraping to see data here.
-                        </p>
-                      </div>
+                  </div>
+                ) : scrapedLinks.length === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-gray-500 text-lg">
+                        No pages found. Start scraping to see data here.
+                      </p>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {scrapedLinks.map((link, index) => (
-                        <Card key={index} className="shadow-sm">
-                          <div className="p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2 flex-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleLinkExpansion(index)}
-                                className="p-1"
-                              >
-                                {link.expanded ? (
-                                  <ChevronDown className="w-4 h-4" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4" />
-                                )}
-                              </Button>
-                              <a 
-                                href={link.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="text-blue-600 hover:underline truncate flex-1"
-                              >
-                                {link.title}
-                              </a>
-                            </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {scrapedLinks.map((link, index) => (
+                      <Card key={index} className="shadow-sm">
+                        <div className="p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-1">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteUrl(link.url)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 ml-2 flex-shrink-0"
+                              onClick={() => toggleLinkExpansion(index)}
+                              className="p-1"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              {link.expanded ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
                             </Button>
+                            <a 
+                              href={link.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-blue-600 hover:underline truncate flex-1"
+                            >
+                              {link.title}
+                            </a>
                           </div>
-                          {link.expanded && (
-                            <div className="px-3 pb-3 border-t border-gray-100">
-                              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                                <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
-                                  {link.content}
-                                </pre>
-                              </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteUrl(link.url)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 ml-2 flex-shrink-0"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        {link.expanded && (
+                          <div className="px-3 pb-3 border-t border-gray-100">
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                              <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
+                                {link.content}
+                              </pre>
                             </div>
-                          )}
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-          <TabsContent value="files" className="h-full">
-            <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Files</h2>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    id="file-upload"
-                    multiple
-                    accept=".pdf,.csv,.xlsx"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <Button 
-                    className="bg-green-500 hover:bg-green-600 text-white rounded-lg"
-                    onClick={() => document.getElementById('file-upload')?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Add File
-                  </Button>
-                </div>
+        {activeView === 'files-found' && (
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Files Found</h2>
+            </div>
+            <Card className="flex-1 border border-gray-200 overflow-y-auto">
+              <CardContent className="h-full p-4">
+                {isLoadingDocuments ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
+                      <p className="text-gray-500 text-lg">
+                        Loading files from database...
+                      </p>
+                    </div>
+                  </div>
+                ) : (scrapedFiles.length === 0 && uploadedFiles.length === 0) ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-gray-500 text-lg">
+                        No files found. Scrape pages to discover files.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Scraped Files */}
+                    {scrapedFiles.map((file, index) => (
+                      <Card key={`scraped-${index}`} className="p-3 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <File className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {decodeFilename(file.filename)}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {file.type.toUpperCase()} • {file.url}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddFileToKnowledgeBase(file)}
+                          className="bg-green-500 hover:bg-green-600 text-white"
+                        >
+                          Add to Knowledge Base
+                        </Button>
+                      </Card>
+                    ))}
+                    
+                    {/* Uploaded Files */}
+                    {uploadedFiles.map((file, index) => (
+                      <Card key={`uploaded-${index}`} className="p-3 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                            <File className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {decodeFilename(file.name)}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {file.type.toUpperCase()} • {(file.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddFileToKnowledgeBase({
+                            url: file.url,
+                            filename: file.name,
+                            type: file.type
+                          })}
+                          className="bg-green-500 hover:bg-green-600 text-white"
+                        >
+                          Add to Knowledge Base
+                        </Button>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeView === 'files' && (
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Files in Knowledge Base</h2>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  id="file-upload"
+                  multiple
+                  accept=".pdf,.csv,.xlsx"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button 
+                  className="bg-green-500 hover:bg-green-600 text-white rounded-lg"
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Add File
+                </Button>
               </div>
-              <Card className="flex-1 border border-gray-200 overflow-y-auto">
-                <CardContent className="h-full p-4">
-                  {isLoadingDocuments ? (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
-                        <p className="text-gray-500 text-lg">
-                          Loading files from database...
-                        </p>
-                      </div>
-                    </div>
-                  ) : (scrapedFiles.length === 0 && uploadedFiles.length === 0) ? (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <p className="text-gray-500 text-lg">
-                          No files available. Upload files or scrape pages to see files here.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {/* Scraped Files */}
-                      {scrapedFiles.map((file, index) => (
-                        <Card key={`scraped-${index}`} className="p-3 flex items-center justify-between shadow-sm">
-                          <div className="flex items-center gap-3 flex-1">
-                            <File className="w-5 h-5 text-blue-500" />
-                            <div className="flex-1">
-                              <a 
-                                href={file.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="text-blue-600 hover:underline font-medium"
-                              >
-                                {decodeFilename(file.filename)}
-                              </a>
-                              <p className="text-sm text-gray-500 capitalize">{file.type.toUpperCase()}</p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUrl(file.url)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </Card>
-                      ))}
-                      
-                      {/* Uploaded Files */}
-                      {uploadedFiles.map((file, index) => (
-                        <Card key={`uploaded-${index}`} className="p-3 flex items-center justify-between shadow-sm">
-                          <div className="flex items-center gap-3 flex-1">
-                            <File className="w-5 h-5 text-green-500" />
-                            <div className="flex-1">
-                              <span className="text-gray-900 font-medium">{decodeFilename(file.name)}</span>
-                              <p className="text-sm text-gray-500">
-                                {file.type.toUpperCase()} • {(file.size / 1024).toFixed(1)} KB
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-                              URL.revokeObjectURL(file.url);
-                            }}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
-          </TabsContent>
-
-        </div>
-      </Tabs>
+            <Card className="flex-1 border border-gray-200 overflow-y-auto">
+              <CardContent className="h-full p-4">
+                {isLoadingDocuments ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
+                      <p className="text-gray-500 text-lg">
+                        Loading files from database...
+                      </p>
+                    </div>
+                  </div>
+                ) : filesAddedToKnowledgeBase.length === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-gray-500 text-lg">
+                        No files in knowledge base. Add files from the "Files Found" tab.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filesAddedToKnowledgeBase.map((file, index) => (
+                      <Card key={`added-${index}`} className="p-3 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                            <File className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {decodeFilename(file.filename)}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {file.type.toUpperCase()} • {file.url}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteFileFromKnowledgeBase(file)}
+                          className="text-white"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </Button>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
 
       {/* Add Page Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
