@@ -3,6 +3,8 @@ import Header from "@/components/Header";
 import FeatureCard from "@/components/FeatureCard";
 import QuestionCard from "@/components/QuestionCard";
 import ChatInterface from "@/components/ChatInterface";
+import Dashboard from "@/components/Dashboard";
+import RecentReports from "@/components/RecentReports";
 import AdminLogin from "@/components/AdminLogin";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,108 +139,8 @@ const Index = () => {
                 </TabsTrigger>
               </TabsList>
               
-              <TabsContent value="dashboard" className="flex-1 m-4 overflow-y-auto">
-                <Card className="h-full">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5" />
-                      Admin Dashboard
-                    </CardTitle>
-                    <CardDescription>
-                      Overview of system metrics and administrative controls
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Total Users</p>
-                              <p className="text-2xl font-bold">1,234</p>
-                            </div>
-                            <Users className="w-8 h-8 text-blue-500" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Active Sessions</p>
-                              <p className="text-2xl font-bold">89</p>
-                            </div>
-                            <Activity className="w-8 h-8 text-green-500" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">System Status</p>
-                              <p className="text-2xl font-bold text-green-600">Online</p>
-                            </div>
-                            <Shield className="w-8 h-8 text-green-500" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Recent Activity</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              <div className="flex-1">
-                                <p className="text-sm">User login successful</p>
-                                <p className="text-xs text-muted-foreground">2 minutes ago</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                              <div className="flex-1">
-                                <p className="text-sm">New chat session started</p>
-                                <p className="text-xs text-muted-foreground">5 minutes ago</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                              <div className="flex-1">
-                                <p className="text-sm">System maintenance scheduled</p>
-                                <p className="text-xs text-muted-foreground">1 hour ago</p>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Quick Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          <Button className="w-full justify-start" variant="outline">
-                            <Database className="w-4 h-4 mr-2" />
-                            Manage Knowledge Base
-                          </Button>
-                          <Button className="w-full justify-start" variant="outline">
-                            <Users className="w-4 h-4 mr-2" />
-                            User Management
-                          </Button>
-                          <Button className="w-full justify-start" variant="outline">
-                            <Settings className="w-4 h-4 mr-2" />
-                            System Settings
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </CardContent>
-                </Card>
+              <TabsContent value="dashboard" className="flex-1 overflow-hidden">
+                <Dashboard />
               </TabsContent>
               
               <TabsContent value="knowledge-base" className="flex-1 m-4 overflow-y-auto">
@@ -316,12 +218,9 @@ const Index = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="reports" className="space-y-4">
-            <div className="text-center py-12 text-muted-foreground">
-              <FileCheck className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">Recent reports will appear here</p>
-            </div>
-          </TabsContent>
+                  <TabsContent value="reports" className="flex-1 overflow-y-auto">
+                    <RecentReports />
+                  </TabsContent>
 
           <TabsContent value="admin" className="space-y-4">
             <AdminLogin onAdminLogin={handleAdminLogin} />
