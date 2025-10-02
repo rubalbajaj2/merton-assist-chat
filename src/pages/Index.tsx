@@ -6,6 +6,7 @@ import ChatInterface from "@/components/ChatInterface";
 import Dashboard from "@/components/Dashboard";
 import RecentReports from "@/components/RecentReports";
 import AdminLogin from "@/components/AdminLogin";
+import KnowledgeBase from "@/components/KnowledgeBase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -143,27 +144,8 @@ const Index = () => {
                 <Dashboard />
               </TabsContent>
               
-              <TabsContent value="knowledge-base" className="flex-1 m-4 overflow-y-auto">
-                <Card className="h-full">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Database className="w-5 h-5" />
-                      Knowledge Base Management
-                    </CardTitle>
-                    <CardDescription>
-                      Manage and organize the AI assistant's knowledge base
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0 h-full">
-                    {/* Merton FOI Application iframe */}
-                    <iframe
-                      src="https://merton-foi.lovable.app/"
-                      className="w-full h-[calc(100vh-300px)] border-0 p-0"
-                      title="Merton FOI Application"
-                      allowFullScreen
-                    />
-                  </CardContent>
-                </Card>
+              <TabsContent value="knowledge-base" className="flex-1 overflow-hidden">
+                <KnowledgeBase />
               </TabsContent>
             </Tabs>
           </div>
