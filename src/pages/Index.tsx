@@ -200,7 +200,7 @@ const Index = () => {
             </div>
           </TabsContent>
 
-                  <TabsContent value="reports" className="flex-1 overflow-y-auto">
+                  <TabsContent value="reports" className="flex-1">
                     <RecentReports />
                   </TabsContent>
 

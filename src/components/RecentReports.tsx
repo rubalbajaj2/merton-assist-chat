@@ -73,7 +73,7 @@ const RecentReports = () => {
   return (
     <div className="h-full flex flex-col">
       {/* Refresh Button */}
-      <div className="flex justify-end p-4 border-b border-border bg-card">
+      <div className="flex justify-end p-4 border-b border-border bg-card flex-shrink-0">
         <Button onClick={fetchIssueRequests} variant="outline" size="sm">
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
@@ -81,29 +81,31 @@ const RecentReports = () => {
       </div>
 
       {/* Scrollable Issue Cards */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-4">
-          {issueRequests.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">No Issue Reports</h3>
-                <p className="text-sm text-gray-500 text-center">
-                  No issues have been reported yet. Check back later for new reports.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {issueRequests.map((request) => (
-                <IssueCard
-                  key={request.id}
-                  request={request}
-                  onExpand={handleCardExpand}
-                />
-              ))}
-            </div>
-          )}
+      <div className="flex-1 p-4">
+        <div className="bg-background rounded-lg border border-border p-3 h-[475px] overflow-y-scroll">
+          <div className="space-y-4">
+            {issueRequests.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">No Issue Reports</h3>
+                  <p className="text-sm text-gray-500 text-center">
+                    No issues have been reported yet. Check back later for new reports.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {issueRequests.map((request) => (
+                  <IssueCard
+                    key={request.id}
+                    request={request}
+                    onExpand={handleCardExpand}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -90,44 +90,48 @@ const IssueCard = ({ request, onExpand }: IssueCardProps) => {
       {isExpanded && (
         <CardContent className="pt-0 border-t border-gray-100">
           <div className="space-y-4">
-            {/* Issue Details */}
+            {/* Top Section: Image on left, Issue Details and Description on right */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Image on the left */}
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-blue-500" />
-                  <span className="font-medium text-gray-700">Issue Details</span>
-                </div>
-                <div className="pl-6 space-y-2">
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Request ID:</span>
-                    <span className="ml-2 text-sm text-gray-900">#{request.id}</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Submitted:</span>
-                    <span className="ml-2 text-sm text-gray-900">{formatDate(request.createdat)}</span>
-                  </div>
+                <div className="w-[190px] h-[190px] rounded-lg border border-gray-200 overflow-hidden bg-gray-100">
+                  <img 
+                    src="https://uozsfevsmkqmgcwhrxrv.supabase.co/storage/v1/object/public/test_images/pothole.jpeg" 
+                    alt="Issue Report Image" 
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-green-500" />
-                  <span className="font-medium text-gray-700">Description</span>
+              {/* Issue Details and Description on the right */}
+              <div className="space-y-4">
+                {/* Issue Details */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-blue-500" />
+                    <span className="font-medium text-gray-700">Issue Details</span>
+                  </div>
+                  <div className="pl-6 space-y-2">
+                    <div>
+                      <span className="text-sm font-medium text-gray-600">Submitted:</span>
+                      <span className="ml-2 text-sm text-gray-900">{formatDate(request.createdat)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="pl-6">
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {request.title}
-                  </p>
+
+                {/* Description */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-green-500" />
+                    <span className="font-medium text-gray-700">Description</span>
+                  </div>
+                  <div className="pl-6">
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {request.title}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-              <Button size="sm" variant="outline" className="text-xs">
-                <FileText className="w-3 h-3 mr-1" />
-                Add Note
-              </Button>
             </div>
           </div>
         </CardContent>
