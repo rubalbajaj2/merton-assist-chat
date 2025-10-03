@@ -59,6 +59,33 @@ export type Database = {
         }
         Relationships: []
       }
+      scraped_files: {
+        Row: {
+          createdat: string | null
+          filename: string
+          id: number
+          source_url: string | null
+          type: Database["public"]["Enums"]["file_type"]
+          url: string
+        }
+        Insert: {
+          createdat?: string | null
+          filename: string
+          id?: number
+          source_url?: string | null
+          type: Database["public"]["Enums"]["file_type"]
+          url: string
+        }
+        Update: {
+          createdat?: string | null
+          filename?: string
+          id?: number
+          source_url?: string | null
+          type?: Database["public"]["Enums"]["file_type"]
+          url?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           address: string | null
@@ -200,6 +227,7 @@ export type Database = {
       }
     }
     Enums: {
+      file_type: "pdf" | "csv" | "xlsx"
       request_type: "forms" | "services" | "issues"
     }
     CompositeTypes: {
@@ -328,6 +356,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      file_type: ["pdf", "csv", "xlsx"],
       request_type: ["forms", "services", "issues"],
     },
   },

@@ -22,6 +22,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { supabase } from '@/integrations/supabase/client'
 import { ScrapingService, ScrapingResult } from '@/services/scraping-service'
 import { DocumentsService, DocumentWithMetadata } from '@/services/documents-service'
+import { ScrapedFilesService, ScrapedFileInput } from '@/services/scraped-files-service'
 import { N8nWebhookService } from '@/services/n8n-webhook-service'
 
 const KnowledgeBase = () => {
@@ -74,9 +75,14 @@ const KnowledgeBase = () => {
         }))
         setScrapedLinks(pageLinksWithExpanded)
         
-        // Extract file links from database documents
-        const fileLinks = DocumentsService.getFileLinks(documents)
-        setScrapedFiles(fileLinks)
+        // Load scraped files from database
+        const scrapedFilesData = await ScrapedFilesService.getScrapedFiles()
+        const formattedScrapedFiles = scrapedFilesData.map(file => ({
+          url: file.url,
+          filename: file.filename,
+          type: file.type as 'pdf' | 'csv' | 'xlsx'
+        }))
+        setScrapedFiles(formattedScrapedFiles)
         
         // Extract files that are already in the knowledge base (from database)
         const addedFiles = DocumentsService.getFileLinks(documents)
@@ -87,10 +93,10 @@ const KnowledgeBase = () => {
         const pageUrls = uniqueLinks.filter(url => !DocumentsService.getFileType(url))
         setScrapedPages(pageUrls)
         
-        console.log('✅ Loaded documents from Supabase:', {
+        console.log('✅ Loaded data from Supabase:', {
           totalDocuments: documents.length,
           pageLinks: pageLinks.length,
-          fileLinks: fileLinks.length,
+          scrapedFiles: formattedScrapedFiles.length,
           addedFiles: addedFiles.length,
           uniquePages: pageUrls.length
         })
@@ -132,7 +138,7 @@ const KnowledgeBase = () => {
       title: 'Files Found',
       value: (scrapedFiles.length + uploadedFiles.length).toString(),
       icon: FileText,
-      bgColor: 'bg-blue-500',
+      bgColor: 'bg-green-500',
       onClick: () => setActiveView('files-found')
     }
   ]
@@ -257,6 +263,9 @@ const KnowledgeBase = () => {
       // Remove from scraped files if it exists there
       setScrapedFiles(prev => prev.filter(f => f.url !== file.url));
       
+      // Remove from database
+      await ScrapedFilesService.deleteScrapedFileByUrl(file.url);
+      
       // Remove from uploaded files if it exists there
       setUploadedFiles(prev => prev.filter(f => f.url !== file.url));
       
@@ -356,6 +365,9 @@ const KnowledgeBase = () => {
         setScrapedPages(prev => prev.filter(url => url !== urlToDelete));
         setScrapedLinks(prev => prev.filter(link => link.url !== urlToDelete));
         setScrapedFiles(prev => prev.filter(file => file.url !== urlToDelete));
+        
+        // Remove from scraped files database
+        await ScrapedFilesService.deleteScrapedFileByUrl(urlToDelete);
         
         toast({
           title: "URL Deleted Successfully",
@@ -459,6 +471,24 @@ const KnowledgeBase = () => {
       }));
       
       setScrapedFiles(prev => [...prev, ...newFiles]);
+      
+      // Save files to Supabase
+      try {
+        const filesToSave: ScrapedFileInput[] = newFiles.map(file => ({
+          url: file.url,
+          filename: file.filename,
+          type: file.type,
+          source_url: urlInput
+        }));
+        
+        if (filesToSave.length > 0) {
+          await ScrapedFilesService.addScrapedFiles(filesToSave);
+          console.log('✅ Saved scraped files to database:', filesToSave.length);
+        }
+      } catch (dbError) {
+        console.error('❌ Failed to save scraped files to database:', dbError);
+        // Don't fail the entire operation if database save fails
+      }
       
       // Add URL to scraped pages
       setScrapedPages(prev => [...prev, urlInput]);
