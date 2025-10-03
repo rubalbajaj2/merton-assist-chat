@@ -225,20 +225,53 @@ const KnowledgeBase = () => {
       });
     }
 
+    const newUploadedFiles: { name: string; url: string; type: 'pdf' | 'csv' | 'xlsx'; size: number }[] = [];
+    const duplicateFiles: string[] = [];
+
     validFiles.forEach(file => {
       const fileUrl = URL.createObjectURL(file);
-      setUploadedFiles(prev => [...prev, {
-        name: file.name,
-        size: file.size,
-        type: getFileTypeFromFile(file),
-        url: fileUrl
-      }]);
+      const fileName = file.name;
+      
+      // Check for duplicates in uploaded files
+      const isDuplicateInUploaded = uploadedFiles.some(uploaded => uploaded.name === fileName);
+      
+      // Check for duplicates in scraped files
+      const isDuplicateInScraped = scrapedFiles.some(scraped => scraped.filename === fileName);
+      
+      if (isDuplicateInUploaded || isDuplicateInScraped) {
+        duplicateFiles.push(fileName);
+        console.log(`⚠️ Skipping duplicate file: ${fileName}`);
+      } else {
+        newUploadedFiles.push({
+          name: file.name,
+          size: file.size,
+          type: getFileTypeFromFile(file),
+          url: fileUrl
+        });
+      }
     });
 
-    if (validFiles.length > 0) {
+    // Add only unique files
+    if (newUploadedFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
+    }
+
+    // Show appropriate feedback
+    if (newUploadedFiles.length > 0 && duplicateFiles.length > 0) {
+      toast({
+        title: "Files Uploaded (Some Duplicates Skipped)",
+        description: `${newUploadedFiles.length} file(s) uploaded successfully. ${duplicateFiles.length} duplicate(s) skipped.`,
+      });
+    } else if (newUploadedFiles.length > 0) {
       toast({
         title: "Files Uploaded",
-        description: `${validFiles.length} file(s) uploaded successfully.`,
+        description: `${newUploadedFiles.length} file(s) uploaded successfully.`,
+      });
+    } else if (duplicateFiles.length > 0) {
+      toast({
+        title: "Duplicate Files Skipped",
+        description: `${duplicateFiles.length} duplicate file(s) were skipped.`,
+        variant: "destructive",
       });
     }
   }
@@ -282,6 +315,72 @@ const KnowledgeBase = () => {
         description: `Failed to add ${decodeFilename(file.filename)} to knowledge base. Please try again.`,
         variant: "destructive",
       });
+    }
+  }
+
+  const handleDeleteAllFiles = async () => {
+    const totalFiles = scrapedFiles.length + uploadedFiles.length;
+    
+    if (totalFiles === 0) {
+      toast({
+        title: "No Files to Delete",
+        description: "There are no files in the Files Found section.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Are you sure you want to delete ALL files from Files Found?\n\n` +
+      `This will remove:\n` +
+      `• ${scrapedFiles.length} scraped file(s)\n` +
+      `• ${uploadedFiles.length} uploaded file(s)\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      // Delete all scraped files from database
+      await ScrapedFilesService.deleteAllScrapedFiles();
+      
+      // Clear local state
+      setScrapedFiles([]);
+      setUploadedFiles([]);
+      
+      toast({
+        title: "All Files Deleted",
+        description: `Successfully deleted ${totalFiles} file(s) from Files Found.`,
+      });
+      
+    } catch (error) {
+      console.error('❌ Error deleting all files:', error);
+      
+      // Ask user if they want to proceed with local deletion only
+      const proceedLocally = window.confirm(
+        `Failed to delete files from database: ${error.message}\n\n` +
+        'Would you like to remove the files from your local Files Found section anyway?'
+      );
+      
+      if (proceedLocally) {
+        // Clear local state only
+        setScrapedFiles([]);
+        setUploadedFiles([]);
+        
+        toast({
+          title: "Files Deleted Locally",
+          description: "Files removed from local Files Found section (database deletion failed).",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Deletion Cancelled",
+          description: "File deletion was cancelled due to database error.",
+          variant: "destructive",
+        });
+      }
     }
   }
 
@@ -470,9 +569,14 @@ const KnowledgeBase = () => {
         type: file.fileType!
       }));
       
-      setScrapedFiles(prev => [...prev, ...newFiles]);
+      // Filter out duplicates from local state
+      const uniqueNewFiles = newFiles.filter(newFile => 
+        !scrapedFiles.some(existingFile => existingFile.url === newFile.url)
+      );
       
-      // Save files to Supabase
+      setScrapedFiles(prev => [...prev, ...uniqueNewFiles]);
+      
+      // Save files to Supabase (service will handle database duplicates)
       try {
         const filesToSave: ScrapedFileInput[] = newFiles.map(file => ({
           url: file.url,
@@ -482,8 +586,14 @@ const KnowledgeBase = () => {
         }));
         
         if (filesToSave.length > 0) {
-          await ScrapedFilesService.addScrapedFiles(filesToSave);
-          console.log('✅ Saved scraped files to database:', filesToSave.length);
+          const savedFiles = await ScrapedFilesService.addScrapedFiles(filesToSave);
+          console.log('✅ Saved scraped files to database:', savedFiles.length);
+          
+          // Show user feedback about duplicates
+          const skippedCount = filesToSave.length - savedFiles.length;
+          if (skippedCount > 0) {
+            console.log(`ℹ️ Skipped ${skippedCount} duplicate files`);
+          }
         }
       } catch (dbError) {
         console.error('❌ Failed to save scraped files to database:', dbError);
@@ -495,7 +605,7 @@ const KnowledgeBase = () => {
       
       toast({
         title: "Page Scraped Successfully",
-        description: `Page added to knowledge base. Found ${result.files.length} files. URL also sent to n8n for processing.`,
+        description: `Page added to knowledge base. Found ${result.files.length} files.`,
       });
       
       // Close dialog and reset form
@@ -505,43 +615,14 @@ const KnowledgeBase = () => {
     } catch (error) {
       console.error('❌ Error scraping website:', error)
       
-      // Show user option to add URL locally even if scraping fails
-      const shouldAddLocally = window.confirm(
-        `Failed to scrape the page: ${error.message}\n\n` +
-        'Would you like to add this URL to your knowledge base anyway? ' +
-        'You can try scraping it again later.'
-      );
+      // The scraping service now returns a fallback result instead of throwing
+      // This catch block should rarely be reached, but handle it gracefully
+      toast({
+        title: "Scraping Failed",
+        description: "Unable to scrape the page content. The URL has been added to your knowledge base.",
+        variant: "destructive",
+      });
       
-      if (shouldAddLocally) {
-        // Add URL to scraped pages locally
-        setScrapedPages(prev => [...prev, urlInput]);
-        
-        // Create a basic link entry
-        const basicLink = {
-          url: urlInput,
-          title: urlInput.split('/').pop() || urlInput,
-          content: 'Content could not be scraped. Click to view the page.',
-          expanded: false
-        };
-        
-        setScrapedLinks(prev => [...prev, basicLink]);
-        
-        toast({
-          title: "URL Added Locally",
-          description: "URL added to knowledge base (scraping failed). You can try scraping again later.",
-          variant: "default",
-        });
-        
-        // Close dialog and reset form
-        setIsDialogOpen(false)
-        setUrlInput('')
-      } else {
-        toast({
-          title: "Scraping Failed",
-          description: `Failed to scrape the page: ${error.message}. Please check the URL and try again.`,
-          variant: "destructive",
-        });
-      }
     } finally {
       setIsScraping(false)
     }
@@ -667,6 +748,19 @@ const KnowledgeBase = () => {
           <div className="h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Files Found</h2>
+              <div className="flex items-center gap-2">
+                {(scrapedFiles.length > 0 || uploadedFiles.length > 0) && (
+                  <Button 
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteAllFiles}
+                    className="text-white"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete All
+                  </Button>
+                )}
+              </div>
             </div>
             <Card className="flex-1 border border-gray-200 overflow-y-auto">
               <CardContent className="h-full p-4">

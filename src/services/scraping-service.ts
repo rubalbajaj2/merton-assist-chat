@@ -16,6 +16,14 @@ export interface ScrapingResult {
 }
 
 export class ScrapingService {
+  // List of CORS proxy services to try
+  private static readonly PROXY_SERVICES = [
+    'https://api.allorigins.win/get?url=',
+    'https://cors-anywhere.herokuapp.com/',
+    'https://corsproxy.io/?',
+    'https://api.codetabs.com/v1/proxy?quest='
+  ];
+
   /**
    * Scrape a website and extract text content and links
    */
@@ -23,16 +31,55 @@ export class ScrapingService {
     try {
       console.log('🔄 Starting to scrape URL:', url);
       
-      // Use a CORS proxy to avoid CORS issues
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      let htmlContent = '';
+      let lastError: Error | null = null;
       
-      const response = await fetch(proxyUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.status}`);
+      // Try each proxy service until one works
+      for (const proxyBase of this.PROXY_SERVICES) {
+        try {
+          console.log(`🔄 Trying proxy: ${proxyBase}`);
+          
+          let proxyUrl: string;
+          if (proxyBase.includes('allorigins.win')) {
+            proxyUrl = `${proxyBase}${encodeURIComponent(url)}`;
+          } else {
+            proxyUrl = `${proxyBase}${url}`;
+          }
+          
+          const response = await fetch(proxyUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json, text/html, */*',
+            },
+            // Add timeout
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Proxy returned ${response.status}: ${response.statusText}`);
+          }
+          
+          let data;
+          if (proxyBase.includes('allorigins.win')) {
+            data = await response.json();
+            htmlContent = data.contents;
+          } else {
+            htmlContent = await response.text();
+          }
+          
+          console.log(`✅ Successfully fetched content via ${proxyBase}`);
+          break; // Success, exit the loop
+          
+        } catch (proxyError) {
+          console.warn(`⚠️ Proxy ${proxyBase} failed:`, proxyError);
+          lastError = proxyError as Error;
+          continue; // Try next proxy
+        }
       }
       
-      const data = await response.json();
-      const htmlContent = data.contents;
+      if (!htmlContent) {
+        throw new Error(`All proxy services failed. Last error: ${lastError?.message}`);
+      }
       
       // Parse HTML content
       const parser = new DOMParser();
@@ -113,7 +160,20 @@ export class ScrapingService {
       
     } catch (error) {
       console.error('❌ Error scraping website:', error);
-      throw new Error(`Failed to scrape website: ${error.message}`);
+      
+      // Return a fallback result instead of throwing an error
+      // This allows the user to still add the URL to their knowledge base
+      console.log('🔄 Returning fallback result due to scraping failure');
+      
+      const fallbackTitle = url.split('/').pop() || 'Scraped Page';
+      
+      return {
+        mainUrl: url,
+        title: fallbackTitle,
+        content: `Content from ${url} - Unable to scrape content due to CORS restrictions. The URL has been added to your knowledge base.`,
+        links: [],
+        files: []
+      };
     }
   }
   

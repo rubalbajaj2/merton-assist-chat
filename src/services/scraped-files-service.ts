@@ -35,10 +35,17 @@ export class ScrapedFilesService {
   }
 
   /**
-   * Add a new scraped file
+   * Add a new scraped file with duplicate prevention
    */
   static async addScrapedFile(fileData: ScrapedFileInput): Promise<ScrapedFile> {
     try {
+      // Check if URL already exists
+      const exists = await this.fileExists(fileData.url);
+      if (exists) {
+        console.log(`⚠️ File URL already exists: ${fileData.url}`);
+        throw new Error(`File with URL ${fileData.url} already exists`);
+      }
+      
       const { data, error } = await supabase
         .from('scraped_files')
         .insert([{
@@ -53,6 +60,7 @@ export class ScrapedFilesService {
         throw error
       }
 
+      console.log(`✅ Added unique file to database: ${fileData.url}`)
       return data as ScrapedFile
     } catch (error) {
       console.error('Failed to add scraped file:', error)
@@ -61,11 +69,35 @@ export class ScrapedFilesService {
   }
 
   /**
-   * Add multiple scraped files
+   * Add multiple scraped files with duplicate prevention
    */
   static async addScrapedFiles(filesData: ScrapedFileInput[]): Promise<ScrapedFile[]> {
     try {
-      const filesWithTimestamp = filesData.map(file => ({
+      // Filter out duplicates before inserting
+      const uniqueFiles: ScrapedFileInput[] = [];
+      const seenUrls = new Set<string>();
+      
+      for (const file of filesData) {
+        if (!seenUrls.has(file.url)) {
+          // Check if URL already exists in database
+          const exists = await this.fileExists(file.url);
+          if (!exists) {
+            uniqueFiles.push(file);
+            seenUrls.add(file.url);
+          } else {
+            console.log(`⚠️ Skipping duplicate URL: ${file.url}`);
+          }
+        } else {
+          console.log(`⚠️ Skipping duplicate URL in batch: ${file.url}`);
+        }
+      }
+      
+      if (uniqueFiles.length === 0) {
+        console.log('ℹ️ No new unique files to add');
+        return [];
+      }
+      
+      const filesWithTimestamp = uniqueFiles.map(file => ({
         ...file,
         createdat: new Date().toISOString()
       }))
@@ -80,6 +112,7 @@ export class ScrapedFilesService {
         throw error
       }
 
+      console.log(`✅ Added ${data.length} unique files to database`)
       return data as ScrapedFile[]
     } catch (error) {
       console.error('Failed to add scraped files:', error)
@@ -197,6 +230,29 @@ export class ScrapedFilesService {
       return data as ScrapedFile[]
     } catch (error) {
       console.error('Failed to fetch scraped files by source:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete all scraped files
+   */
+  static async deleteAllScrapedFiles(): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('scraped_files')
+        .delete()
+        .neq('id', 0) // Delete all records (id is never 0)
+
+      if (error) {
+        console.error('Error deleting all scraped files:', error)
+        throw error
+      }
+
+      console.log('✅ Successfully deleted all scraped files from database')
+      return true
+    } catch (error) {
+      console.error('Failed to delete all scraped files:', error)
       throw error
     }
   }
