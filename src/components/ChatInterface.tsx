@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, MessageCircle } from "lucide-react";
+import { Send, MessageCircle, Paperclip, X, ImageIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { N8nWebhookService, N8nChatMessage } from "@/services/n8n-webhook-service";
 
@@ -9,6 +9,14 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  imageUrl?: string;
+}
+
+interface ImageUpload {
+  file: File;
+  filename: string;
+  fileType: string;
+  fileSize: number;
 }
 
 interface ChatInterfaceProps {
@@ -26,6 +34,8 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Initialize n8n chat session
   useEffect(() => {
@@ -47,13 +57,37 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     }
   }, [selectedQuestion, onQuestionProcessed]);
 
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate image file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file (JPG, PNG, GIF, etc.)');
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Image file size must be less than 10MB');
+        return;
+      }
+      
+      setSelectedImage(file);
+      
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
+  };
+
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() && !selectedImage) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input
+      content: input || (selectedImage ? `Uploaded image: ${selectedImage.name}` : ''),
+      imageUrl: imagePreview || undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -61,8 +95,30 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     setIsLoading(true);
 
     try {
-      console.log('📤 Sending message via n8n service:', userMessage.content);
-      const response = await N8nWebhookService.sendMessage(userMessage.content);
+      let response;
+      
+      if (selectedImage && input.trim()) {
+        // Send message with image
+        const imageUpload: ImageUpload = {
+          file: selectedImage,
+          filename: selectedImage.name,
+          fileType: selectedImage.type,
+          fileSize: selectedImage.size
+        };
+        response = await N8nWebhookService.sendMessageWithImage(input, imageUpload);
+      } else if (selectedImage) {
+        // Send image only
+        const imageUpload: ImageUpload = {
+          file: selectedImage,
+          filename: selectedImage.name,
+          fileType: selectedImage.type,
+          fileSize: selectedImage.size
+        };
+        response = await N8nWebhookService.uploadImage(imageUpload);
+      } else {
+        // Send message only
+        response = await N8nWebhookService.sendMessage(input);
+      }
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -71,8 +127,14 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      console.log('📥 Received response:', response.message);
-
+      
+      // Clear selected image
+      if (selectedImage) {
+        URL.revokeObjectURL(imagePreview!);
+        setSelectedImage(null);
+        setImagePreview(null);
+      }
+      
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
@@ -101,6 +163,13 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     }]);
     setInput("");
     
+    // Clear selected image
+    if (selectedImage) {
+      URL.revokeObjectURL(imagePreview!);
+      setSelectedImage(null);
+      setImagePreview(null);
+    }
+    
     // Reset n8n session
     N8nWebhookService.resetSession().then(() => {
       console.log('🔄 n8n session reset');
@@ -113,7 +182,7 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     <div className="flex flex-col h-full bg-card rounded-lg border border-border min-h-[450px]">
       <div className="flex items-center gap-2 p-4 border-b border-border flex-shrink-0">
         <MessageCircle className="w-5 h-5 text-secondary" />
-        <h3 className="font-semibold text-lg">Ask Merti!</h3>
+        <h3 className="font-semibold text-2xl">Ask Merti!</h3>
         <Button variant="destructive" size="sm" className="ml-auto" onClick={handleClearChat}>
           Clear Chat
         </Button>
@@ -134,6 +203,16 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
                 }`}
               >
                 {message.content}
+                {message.imageUrl && (
+                  <div className="mt-2">
+                    <img 
+                      src={message.imageUrl} 
+                      alt="Uploaded image" 
+                      className="max-w-full h-auto rounded"
+                      style={{ maxHeight: '200px' }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -151,6 +230,32 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
       </ScrollArea>
 
       <div className="p-4 border-t border-border flex-shrink-0">
+        {/* Image Preview */}
+        {imagePreview && (
+          <div className="mb-3 p-2 border rounded-lg bg-muted/50">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Selected Image:</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  URL.revokeObjectURL(imagePreview);
+                  setSelectedImage(null);
+                  setImagePreview(null);
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <img 
+              src={imagePreview} 
+              alt="Preview" 
+              className="mt-2 max-w-full h-auto rounded"
+              style={{ maxHeight: '100px' }}
+            />
+          </div>
+        )}
+        
         <div className="flex items-center gap-2">
           <Input
             placeholder="Type your message..."
@@ -160,11 +265,26 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
             className="flex-1"
             disabled={isLoading}
           />
+          <input
+            type="file"
+            id="image-upload"
+            onChange={handleImageSelect}
+            className="hidden"
+            accept="image/*"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => document.getElementById('image-upload')?.click()}
+            disabled={isLoading}
+          >
+            <ImageIcon className="w-5 h-5" />
+          </Button>
           <Button 
             size="icon" 
             className="flex-shrink-0 bg-secondary hover:bg-secondary/90"
             onClick={handleSend}
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || (!input.trim() && !selectedImage)}
           >
             <Send className="w-5 h-5" />
           </Button>
