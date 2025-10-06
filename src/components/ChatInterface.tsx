@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, MessageCircle, Paperclip, X, ImageIcon } from "lucide-react";
@@ -36,6 +36,7 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
   const [isLoading, setIsLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Initialize n8n chat session
   useEffect(() => {
@@ -78,6 +79,18 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
       const previewUrl = URL.createObjectURL(file);
       setImagePreview(previewUrl);
     }
+    
+    // Reset the input value to allow selecting the same file again
+    event.target.value = '';
+  };
+
+  const scrollToBottom = () => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
   };
 
   const handleSend = async () => {
@@ -93,6 +106,16 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
+
+    // Clear selected image immediately after sending
+    if (selectedImage) {
+      URL.revokeObjectURL(imagePreview!);
+      setSelectedImage(null);
+      setImagePreview(null);
+    }
+
+    // Scroll to bottom after adding user message
+    setTimeout(scrollToBottom, 100);
 
     try {
       let response;
@@ -128,12 +151,8 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
 
       setMessages(prev => [...prev, assistantMessage]);
       
-      // Clear selected image
-      if (selectedImage) {
-        URL.revokeObjectURL(imagePreview!);
-        setSelectedImage(null);
-        setImagePreview(null);
-      }
+      // Scroll to bottom after adding assistant message
+      setTimeout(scrollToBottom, 100);
       
     } catch (error) {
       console.error('Error sending message:', error);
@@ -143,6 +162,8 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
         content: "I'm sorry, I'm having trouble processing your request right now. Please try again."
       };
       setMessages(prev => [...prev, errorMessage]);
+      // Scroll to bottom after adding error message
+      setTimeout(scrollToBottom, 100);
     } finally {
       setIsLoading(false);
     }
@@ -188,7 +209,7 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
         <div className="space-y-4">
           {messages.map((message) => (
             <div
