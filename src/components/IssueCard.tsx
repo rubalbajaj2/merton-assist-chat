@@ -90,14 +90,33 @@ const IssueCard = ({ request, onExpand }: IssueCardProps) => {
       {isExpanded && (
         <CardContent className="pt-0 border-t border-gray-100">
           <div className="space-y-4">
-            {/* Top Section: Image on left, Issue Details and Description on right */}
+            {/* Top Section: Multiple Images on left, Issue Details and Description on right */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Image on the left */}
-              <div className="space-y-3">
+              {/* Multiple Images on the left */}
+              <div className="flex gap-3">
+                {/* First Image */}
                 <div className="w-[190px] h-[190px] rounded-lg border border-gray-200 overflow-hidden bg-gray-100">
                   <img 
                     src="https://uozsfevsmkqmgcwhrxrv.supabase.co/storage/v1/object/public/test_images/pothole.jpeg" 
-                    alt="Issue Report Image" 
+                    alt="Issue Report Image 1" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                {/* Second Image */}
+                <div className="w-[190px] h-[190px] rounded-lg border border-gray-200 overflow-hidden bg-gray-100">
+                  <img 
+                    src="https://uozsfevsmkqmgcwhrxrv.supabase.co/storage/v1/object/public/test_images/pothole(1).jpeg" 
+                    alt="Issue Report Image 2" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                {/* Third Image */}
+                <div className="w-[190px] h-[190px] rounded-lg border border-gray-200 overflow-hidden bg-gray-100">
+                  <img 
+                    src="https://uozsfevsmkqmgcwhrxrv.supabase.co/storage/v1/object/public/test_images/pothole(2).jpeg" 
+                    alt="Issue Report Image 3" 
                     className="w-full h-full object-cover"
                   />
                 </div>

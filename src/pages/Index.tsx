@@ -14,7 +14,7 @@ import {
   Calendar, 
   FileText, 
   AlertCircle, 
-  Wrench, 
+  Banknote, 
   Info,
   Lightbulb,
   Trash2,
@@ -22,7 +22,6 @@ import {
   MapPin,
   Home,
   Users,
-  DollarSign,
   Shield,
   Book,
   Phone,
@@ -52,8 +51,8 @@ const Index = () => {
     { icon: Calendar, title: "Calendar reminders" },
     { icon: FileText, title: "Form filling" },
     { icon: AlertCircle, title: "Issue reporting" },
-    { icon: Wrench, title: "Service requests" },
-    { icon: Info, title: "Providing information" },
+    { icon: Banknote, title: "Benefit Requests" },
+    { icon: Info, title: "Freedom of Information" },
   ];
 
   const questions = [
@@ -61,7 +60,6 @@ const Index = () => {
     { icon: Trash2, question: "Set up a bin reminder for me", category: "Waste Management" },
     { icon: Car, question: "Apply for a parking permit", category: "Parking" },
     { icon: MapPin, question: "Report a pothole in my street", category: "Highways" },
-    { icon: DollarSign, question: "Pay my council tax", category: "Council Tax" },
     { icon: Home, question: "Report abandoned property", category: "Housing" },
     { icon: Users, question: "Register for council updates", category: "Communications" },
     { icon: Shield, question: "Report antisocial behavior", category: "Community Safety" },
