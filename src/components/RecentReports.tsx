@@ -16,7 +16,6 @@ const RecentReports = () => {
   const [issueRequests, setIssueRequests] = useState<Request[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [expandedCard, setExpandedCard] = useState<number | null>(null)
 
   const fetchIssueRequests = async () => {
     try {
@@ -35,10 +34,6 @@ const RecentReports = () => {
   useEffect(() => {
     fetchIssueRequests()
   }, [])
-
-  const handleCardExpand = (requestId: number) => {
-    setExpandedCard(expandedCard === requestId ? null : requestId)
-  }
 
   if (loading) {
     return (
@@ -80,32 +75,29 @@ const RecentReports = () => {
         </Button>
       </div>
 
-      {/* Scrollable Issue Cards */}
+      {/* Grid Layout for Issue Cards */}
       <div className="flex-1 p-4">
         <div className="bg-background rounded-lg border border-border p-3 h-[475px] overflow-y-scroll">
-          <div className="space-y-4">
-            {issueRequests.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">No Issue Reports</h3>
-                  <p className="text-sm text-gray-500 text-center">
-                    No issues have been reported yet. Check back later for new reports.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {issueRequests.map((request) => (
-                  <IssueCard
-                    key={request.id}
-                    request={request}
-                    onExpand={handleCardExpand}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          {issueRequests.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">No Issue Reports</h3>
+                <p className="text-sm text-gray-500 text-center">
+                  No issues have been reported yet. Check back later for new reports.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              {issueRequests.map((request) => (
+                <IssueCard
+                  key={request.id}
+                  request={request}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

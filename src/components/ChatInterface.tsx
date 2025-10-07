@@ -29,7 +29,7 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     {
       id: "1",
       role: "assistant",
-      content: "Hi! I'm a Merton council agent. I'm here to help, whether that's by providing information or finding the right service for you."
+      content: "Hi! I'm a Merton council AI agent. I'm here to help, whether you need information, want to report an issue, or need to complete a task."
     }
   ]);
   const [input, setInput] = useState("");
@@ -180,7 +180,7 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     setMessages([{
       id: "1",
       role: "assistant",
-      content: "Hi! I'm a Merton council agent. I'm here to help, whether that's by providing information or finding the right service for you."
+      content: "Hi! I'm a Merton council AI agent. I'm here to help, whether you need information, want to report an issue, or need to complete a task."
     }]);
     setInput("");
     
