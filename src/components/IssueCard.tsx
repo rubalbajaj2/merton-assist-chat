@@ -26,17 +26,23 @@ const IssueCard = ({ request }: IssueCardProps) => {
       try {
         setIsLoadingImage(true)
         
+        console.log(`🔍 Loading images for request ID: ${request.id}`)
+        
         // Check if there are any images uploaded for this specific request using S3
         const requestImages = await S3StorageService.getImagesForRequest(request.id)
+        
+        console.log(`📸 Found ${requestImages.length} images for request ${request.id}:`, requestImages)
         
         if (requestImages.length > 0) {
           // Use the first uploaded image for this request
           setImageUrl(requestImages[0])
           setHasImage(true)
+          console.log(`✅ Set image URL for request ${request.id}:`, requestImages[0])
         } else {
           // No image uploaded for this request
           setHasImage(false)
           setImageUrl('')
+          console.log(`❌ No images found for request ${request.id}`)
         }
         
       } catch (error) {
@@ -100,7 +106,11 @@ const IssueCard = ({ request }: IssueCardProps) => {
                     src={imageUrl} 
                     alt="Issue Report Image" 
                     className="w-full h-full object-cover"
-                    onError={() => {
+                    onLoad={() => {
+                      console.log(`✅ Image loaded successfully for request ${request.id}:`, imageUrl)
+                    }}
+                    onError={(e) => {
+                      console.error(`❌ Image failed to load for request ${request.id}:`, imageUrl, e)
                       // If image fails to load, show no image state
                       setHasImage(false)
                     }}

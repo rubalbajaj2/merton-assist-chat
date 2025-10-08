@@ -73,8 +73,8 @@ To use S3 protocol with Supabase storage, you need to set up credentials.
       const result = await s3Client.send(command)
       console.log('✅ Image uploaded successfully:', result)
       
-      // Generate public URL
-      const publicUrl = `${this.ENDPOINT}/${this.BUCKET_NAME}/${path}`
+      // Generate public URL using the proper Supabase format
+      const publicUrl = this.getImageUrl(path)
       console.log('🔗 Public URL:', publicUrl)
       
       return publicUrl
@@ -87,9 +87,12 @@ To use S3 protocol with Supabase storage, you need to set up credentials.
 
   /**
    * Get a public URL for an image in the test_images bucket
+   * Uses the proper Supabase public URL format
    */
   static getImageUrl(imagePath: string): string {
-    return `${this.ENDPOINT}/${this.BUCKET_NAME}/${imagePath}`
+    // Use the standard Supabase public URL format instead of S3 endpoint
+    const baseUrl = 'https://uozsfevsmkqmgcwhrxrv.supabase.co'
+    return `${baseUrl}/storage/v1/object/public/${this.BUCKET_NAME}/${imagePath}`
   }
 
   /**
@@ -120,24 +123,49 @@ To use S3 protocol with Supabase storage, you need to set up credentials.
 
   /**
    * Get images for a specific request ID
+   * This includes both request-specific images and recent chat uploads
    */
   static async getImagesForRequest(requestId: number): Promise<string[]> {
     try {
       const s3Client = this.getS3Client()
+      const images: string[] = []
       
-      const command = new ListObjectsV2Command({
+      // 1. Check for request-specific images in request_{id}/ folder
+      const requestCommand = new ListObjectsV2Command({
         Bucket: this.BUCKET_NAME,
         Prefix: `request_${requestId}/`,
         MaxKeys: 1000,
       })
 
-      const result = await s3Client.send(command)
-      
-      if (!result.Contents) {
-        return []
+      const requestResult = await s3Client.send(requestCommand)
+      if (requestResult.Contents) {
+        const requestImages = requestResult.Contents.map(obj => this.getImageUrl(obj.Key || ''))
+        images.push(...requestImages)
       }
 
-      return result.Contents.map(obj => this.getImageUrl(obj.Key || ''))
+      // 2. If no request-specific images, check for recent chat uploads
+      if (images.length === 0) {
+        const chatCommand = new ListObjectsV2Command({
+          Bucket: this.BUCKET_NAME,
+          Prefix: 'chat_upload_',
+          MaxKeys: 10, // Get recent chat uploads
+        })
+
+        const chatResult = await s3Client.send(chatCommand)
+        if (chatResult.Contents) {
+          // Sort by last modified date (most recent first)
+          const sortedChatImages = chatResult.Contents
+            .sort((a, b) => (b.LastModified?.getTime() || 0) - (a.LastModified?.getTime() || 0))
+            .map(obj => this.getImageUrl(obj.Key || ''))
+          
+          // Return the most recent chat upload for this request
+          if (sortedChatImages.length > 0) {
+            images.push(sortedChatImages[0])
+          }
+        }
+      }
+
+      return images
       
     } catch (error) {
       console.error('❌ Error getting images for request via S3:', error)
