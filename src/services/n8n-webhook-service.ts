@@ -263,9 +263,9 @@ export class N8nWebhookService {
       formData.append('sessionId', this.sessionId);
       formData.append('timestamp', new Date().toISOString());
       
-      // Add optional message
+      // Add optional message parameter
       if (message) {
-        formData.append('message', message);
+        formData.append('chatInput', message);
       }
 
       const response = await fetch(this.WEBHOOK_URL, {
@@ -319,26 +319,26 @@ export class N8nWebhookService {
       }
       
       // Handle different response formats
-      let message = '';
+      let responseMessage = '';
       if (data.type === 'error') {
-        message = 'Sorry, I encountered an error processing your image. Please try again.';
+        responseMessage = 'Sorry, I encountered an error processing your image. Please try again.';
       } else if (data.output) {
         // Handle n8n "last node" response format
-        message = data.output;
+        responseMessage = data.output;
       } else if (data.content) {
-        message = data.content;
+        responseMessage = data.content;
       } else if (data.message) {
-        message = data.message;
+        responseMessage = data.message;
       } else if (data.response) {
-        message = data.response;
+        responseMessage = data.response;
       } else if (data.text) {
-        message = data.text;
+        responseMessage = data.text;
       } else {
-        message = 'Image uploaded successfully, but no response received from the assistant.';
+        responseMessage = 'Image uploaded successfully, but no response received from the assistant.';
       }
       
       return {
-        message: message,
+        message: responseMessage,
         sessionId: data.sessionId || this.sessionId,
         metadata: data
       };

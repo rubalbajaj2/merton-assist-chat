@@ -7,7 +7,7 @@ type Document = Tables<'documents'>
 export interface DocumentWithMetadata {
   id: number
   content: string
-  embedding: number[] | null
+  embedding: string | null
   metadata: {
     loc?: {
       lines?: {

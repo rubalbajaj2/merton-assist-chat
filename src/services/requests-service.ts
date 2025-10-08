@@ -37,7 +37,7 @@ export class RequestsService {
     }
   }
   static async getRequests(filters?: {
-    type?: string
+    type?: 'forms' | 'issues' | 'services'
     addedby?: string
     limit?: number
   }) {
@@ -134,7 +134,7 @@ export class RequestsService {
   /**
    * Create a new request
    */
-  static async createRequest(requestData: Partial<Request>) {
+  static async createRequest(requestData: Omit<Request, 'id' | 'createdat'>) {
     try {
       const { data, error } = await supabase
         .from('requests')
