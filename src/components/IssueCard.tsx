@@ -1,15 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { 
   Calendar, 
   AlertCircle,
   FileText,
-  Eye
+  ImageIcon
 } from 'lucide-react'
 import type { Tables } from '@/integrations/supabase/types'
+import { S3StorageService } from '@/services/s3-storage-service'
 
 type Request = Tables<'requests'>
 
@@ -18,6 +17,39 @@ interface IssueCardProps {
 }
 
 const IssueCard = ({ request }: IssueCardProps) => {
+  const [imageUrl, setImageUrl] = useState<string>('')
+  const [isLoadingImage, setIsLoadingImage] = useState(true)
+  const [hasImage, setHasImage] = useState<boolean>(false)
+
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        setIsLoadingImage(true)
+        
+        // Check if there are any images uploaded for this specific request using S3
+        const requestImages = await S3StorageService.getImagesForRequest(request.id)
+        
+        if (requestImages.length > 0) {
+          // Use the first uploaded image for this request
+          setImageUrl(requestImages[0])
+          setHasImage(true)
+        } else {
+          // No image uploaded for this request
+          setHasImage(false)
+          setImageUrl('')
+        }
+        
+      } catch (error) {
+        console.error('Error loading image via S3:', error)
+        setHasImage(false)
+        setImageUrl('')
+      } finally {
+        setIsLoadingImage(false)
+      }
+    }
+
+    loadImage()
+  }, [request.id])
 
   const getPriorityColor = (type: string) => {
     // Map request types to priority colors - only 'issues' is valid enum
@@ -49,28 +81,54 @@ const IssueCard = ({ request }: IssueCardProps) => {
       <DialogTrigger asChild>
         <Card className="w-full border-l-4 border-l-blue-500 hover:shadow-md transition-shadow cursor-pointer">
           <CardHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-lg font-semibold text-gray-900 mb-2">
-                  {request.title}
-                </CardTitle>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>Submitted: {formatDate(request.createdat)}</span>
+            <CardTitle className="text-lg font-semibold text-gray-900 mb-2">
+              {request.title}
+            </CardTitle>
+          </CardHeader>
+          
+          <CardContent className="pt-0">
+            {/* Image and Details Side by Side */}
+            <div className="flex gap-4 items-start">
+              {/* Image on the left */}
+              <div className="w-[75px] h-[75px] rounded-lg border border-gray-200 overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                {isLoadingImage ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-500"></div>
+                  </div>
+                ) : hasImage ? (
+                  <img 
+                    src={imageUrl} 
+                    alt="Issue Report Image" 
+                    className="w-full h-full object-cover"
+                    onError={() => {
+                      // If image fails to load, show no image state
+                      setHasImage(false)
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-200 text-gray-500 text-xs text-center p-1">
+                    <ImageIcon className="w-4 h-4 mb-1" />
+                    <span>No Image</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Issue Details on the right */}
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-blue-500" />
+                  <span className="font-medium text-gray-700 text-sm">Issue Details</span>
+                </div>
+                <div className="pl-6">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-3 h-3 text-gray-500" />
+                    <span className="text-xs font-medium text-gray-600">Submitted:</span>
+                    <span className="text-xs text-gray-900">{formatDate(request.createdat)}</span>
                   </div>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1 text-gray-500 hover:text-gray-700"
-              >
-                <Eye className="w-4 h-4" />
-                <span className="text-xs">View</span>
-              </Button>
             </div>
-          </CardHeader>
+          </CardContent>
         </Card>
       </DialogTrigger>
       
@@ -85,11 +143,27 @@ const IssueCard = ({ request }: IssueCardProps) => {
             {/* Image */}
             <div className="flex justify-center">
               <div className="w-[300px] h-[300px] rounded-lg border border-gray-200 overflow-hidden bg-gray-100">
-                <img 
-                  src="https://uozsfevsmkqmgcwhrxrv.supabase.co/storage/v1/object/public/test_images/pothole.jpeg" 
-                  alt="Issue Report Image" 
-                  className="w-full h-full object-cover"
-                />
+                {isLoadingImage ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-500"></div>
+                  </div>
+                ) : hasImage ? (
+                  <img 
+                    src={imageUrl} 
+                    alt="Issue Report Image" 
+                    className="w-full h-full object-cover"
+                    onError={() => {
+                      // If image fails to load, show no image state
+                      setHasImage(false)
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-200 text-gray-500">
+                    <ImageIcon className="w-16 h-16 mb-4" />
+                    <span className="text-lg font-medium">Image Not Uploaded</span>
+                    <span className="text-sm text-center mt-2">No image was uploaded for this issue report</span>
+                  </div>
+                )}
               </div>
             </div>
 

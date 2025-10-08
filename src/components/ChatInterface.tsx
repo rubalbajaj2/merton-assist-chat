@@ -4,12 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Send, MessageCircle, Paperclip, X, ImageIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { N8nWebhookService, N8nChatMessage } from "@/services/n8n-webhook-service";
+import { S3StorageService } from "@/services/s3-storage-service";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   imageUrl?: string;
+  supabaseImageUrl?: string;
 }
 
 interface ImageUpload {
@@ -27,8 +29,8 @@ interface ChatInterfaceProps {
 const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: "1",
-      role: "assistant",
+    id: "1",
+    role: "assistant",
       content: "Hi! I'm a Merton council AI agent. I'm here to help, whether you need information, want to report an issue, or need to complete a task."
     }
   ]);
@@ -93,6 +95,30 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
     }
   };
 
+  const uploadImageToSupabase = async (file: File): Promise<string | null> => {
+    try {
+      // Generate a unique filename with timestamp
+      const timestamp = Date.now();
+      const fileExtension = file.name.split('.').pop();
+      const filename = `chat_upload_${timestamp}.${fileExtension}`;
+      
+      // Upload to Supabase storage using S3 protocol
+      const publicUrl = await S3StorageService.uploadImage(file, filename);
+      
+      if (publicUrl) {
+        console.log('✅ Image uploaded to Supabase S3 storage:', publicUrl);
+        return publicUrl;
+      } else {
+        console.error('Failed to upload image to Supabase S3 storage');
+        return null;
+      }
+      
+    } catch (error) {
+      console.error('Error uploading image to Supabase S3 storage:', error);
+      return null;
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() && !selectedImage) return;
 
@@ -119,6 +145,19 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
 
     try {
       let response;
+      let supabaseImageUrl: string | null = null;
+      
+      // Upload image to Supabase first if there's an image
+      if (selectedImage) {
+        console.log('📤 Uploading image to Supabase storage...');
+        supabaseImageUrl = await uploadImageToSupabase(selectedImage);
+        
+        if (supabaseImageUrl) {
+          console.log('✅ Image successfully uploaded to Supabase:', supabaseImageUrl);
+        } else {
+          console.warn('⚠️ Failed to upload image to Supabase, continuing with n8n only');
+        }
+      }
       
       if (selectedImage && input.trim()) {
         // Send message with image
@@ -141,6 +180,15 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
       } else {
         // Send message only
         response = await N8nWebhookService.sendMessage(input);
+      }
+      
+      // Update the user message with Supabase URL if available
+      if (supabaseImageUrl && selectedImage) {
+        setMessages(prev => prev.map(msg => 
+          msg.id === userMessage.id 
+            ? { ...msg, supabaseImageUrl: supabaseImageUrl }
+            : msg
+        ));
       }
       
       const assistantMessage: Message = {
