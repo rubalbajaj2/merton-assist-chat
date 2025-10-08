@@ -76,7 +76,6 @@ const Index = () => {
     { icon: Home, question: "Report graffiti removal", category: "Street Cleaning" },
     { icon: TreePine, question: "Book a garden waste subscription", category: "Waste Management" },
     { icon: MapPin, question: "Find my local councillor", category: "Democracy" },
-    { icon: FileText, question: "Request copy of birth certificate", category: "Registration" },
     { icon: Phone, question: "Report noise complaint", category: "Environmental Health" },
   ];
 
