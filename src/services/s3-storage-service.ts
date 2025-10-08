@@ -143,26 +143,10 @@ To use S3 protocol with Supabase storage, you need to set up credentials.
         images.push(...requestImages)
       }
 
-      // 2. If no request-specific images, check for recent chat uploads
+      // 2. If no request-specific images, show "No Image" instead of assigning random chat uploads
+      // This prevents all requests from showing the same image
       if (images.length === 0) {
-        const chatCommand = new ListObjectsV2Command({
-          Bucket: this.BUCKET_NAME,
-          Prefix: 'chat_upload_',
-          MaxKeys: 10, // Get recent chat uploads
-        })
-
-        const chatResult = await s3Client.send(chatCommand)
-        if (chatResult.Contents) {
-          // Sort by last modified date (most recent first)
-          const sortedChatImages = chatResult.Contents
-            .sort((a, b) => (b.LastModified?.getTime() || 0) - (a.LastModified?.getTime() || 0))
-            .map(obj => this.getImageUrl(obj.Key || ''))
-          
-          // Return the most recent chat upload for this request
-          if (sortedChatImages.length > 0) {
-            images.push(sortedChatImages[0])
-          }
-        }
+        console.log(`No specific images found for request ${requestId}, will show "No Image"`)
       }
 
       return images

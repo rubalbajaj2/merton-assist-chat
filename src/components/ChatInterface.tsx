@@ -5,6 +5,8 @@ import { Send, MessageCircle, Paperclip, X, ImageIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { N8nWebhookService, N8nChatMessage } from "@/services/n8n-webhook-service";
 import { S3StorageService } from "@/services/s3-storage-service";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
   id: string;
@@ -271,7 +273,36 @@ const ChatInterface = ({ selectedQuestion, onQuestionProcessed }: ChatInterfaceP
                     : "bg-primary text-primary-foreground"
                 }`}
               >
-                {message.content}
+                {message.role === "assistant" ? (
+                  <div className="prose prose-invert prose-sm max-w-none">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        // Custom styling for markdown elements
+                        h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                        h2: ({children}) => <h2 className="text-base font-semibold mb-2">{children}</h2>,
+                        h3: ({children}) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+                        p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                        ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                        li: ({children}) => <li className="text-sm">{children}</li>,
+                        code: ({children}) => <code className="bg-black/20 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                        pre: ({children}) => <pre className="bg-black/20 p-2 rounded text-xs font-mono overflow-x-auto mb-2">{children}</pre>,
+                        blockquote: ({children}) => <blockquote className="border-l-2 border-white/30 pl-2 italic mb-2">{children}</blockquote>,
+                        strong: ({children}) => <strong className="font-semibold">{children}</strong>,
+                        em: ({children}) => <em className="italic">{children}</em>,
+                        a: ({children, href}) => <a href={href} className="underline hover:no-underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                        table: ({children}) => <table className="border-collapse border border-white/30 mb-2">{children}</table>,
+                        th: ({children}) => <th className="border border-white/30 px-2 py-1 bg-white/10 font-semibold">{children}</th>,
+                        td: ({children}) => <td className="border border-white/30 px-2 py-1">{children}</td>,
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  message.content
+                )}
                 {message.imageUrl && (
                   <div className="mt-2">
                     <img 
