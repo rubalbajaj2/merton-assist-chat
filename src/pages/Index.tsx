@@ -1,6 +1,5 @@
 import { useState } from "react";
 import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import FeatureCard from "@/components/FeatureCard";
 import QuestionCard from "@/components/QuestionCard";
 import ChatInterface from "@/components/ChatInterface";
@@ -98,8 +97,19 @@ const Index = () => {
   };
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-screen bg-background flex flex-col overflow-hidden relative">
       <Header />
+      
+      {/* Amorphic | AWS Logo - Bottom Right */}
+      <div className="fixed bottom-4 right-6 flex items-center gap-3 z-10">
+        <span className="text-sm font-medium text-foreground">Amorphic</span>
+        <span className="text-muted-foreground">|</span>
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/9/93/Amazon_Web_Services_Logo.svg" 
+          alt="AWS" 
+          className="h-5 w-auto" 
+        />
+      </div>
       
       <div className="container mx-auto flex-1 py-6 px-6 overflow-hidden min-h-0">
         {isAdminLoggedIn ? (
@@ -206,8 +216,6 @@ const Index = () => {
         </Tabs>
         )}
       </div>
-      
-      <Footer />
     </div>
   );
 };
