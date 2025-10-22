@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import FeatureCard from "@/components/FeatureCard";
 import QuestionCard from "@/components/QuestionCard";
 import ChatInterface from "@/components/ChatInterface";
@@ -100,7 +101,7 @@ const Index = () => {
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Header />
       
-      <div className="container mx-auto flex-1 py-6 px-6 overflow-hidden">
+      <div className="container mx-auto flex-1 py-6 px-6 overflow-hidden min-h-0">
         {isAdminLoggedIn ? (
           <div className="w-full h-full flex flex-col overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-border bg-card flex-shrink-0">
@@ -205,6 +206,8 @@ const Index = () => {
         </Tabs>
         )}
       </div>
+      
+      <Footer />
     </div>
   );
 };
