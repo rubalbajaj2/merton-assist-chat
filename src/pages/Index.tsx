@@ -174,7 +174,7 @@ const Index = () => {
             {/* Main Content Area - Side by Side */}
             <div className="grid md:grid-cols-[350px_1fr] gap-6 h-[500px]">
               {/* Left: Questions Sidebar */}
-              <div className="bg-card rounded-lg border border-border p-4 flex flex-col h-[450px] min-h-0">
+              <div className="bg-card rounded-lg border border-border p-4 flex flex-col h-[440px] min-h-0">
                 <div className="flex items-center gap-2 mb-4">
                   <FileText className="w-5 h-5" />
                   <h2 className="text-lg font-semibold">What Can I Do...</h2>
@@ -197,7 +197,7 @@ const Index = () => {
               </div>
 
               {/* Right: Chat Interface */}
-              <div className="h-[450px] flex flex-col">
+              <div className="h-[440px] flex flex-col">
               <ChatInterface 
                 selectedQuestion={selectedQuestion}
                 onQuestionProcessed={handleQuestionProcessed}
