@@ -9,16 +9,16 @@ All colors MUST be HSL.
 @layer base {
 :root {
     --background: 0 0% 98%;
-    --foreground: 240 10% 15%;
+    --foreground: 0 0% 25%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 15%;
+    --card-foreground: 0 0% 25%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 15%;
+    --popover-foreground: 0 0% 25%;
 
-    /* Merton Purple */
-    --primary: 277 58% 37%;
+    /* Darker Purple #582C83 */
+    --primary: 273 50% 34%;
     --primary-foreground: 0 0% 100%;
 
     /* Dark Green for buttons */
@@ -28,15 +28,15 @@ All colors MUST be HSL.
     --muted: 240 5% 96%;
     --muted-foreground: 240 4% 46%;
 
-    --accent: 277 58% 95%;
-    --accent-foreground: 277 58% 37%;
+    --accent: 273 50% 95%;
+    --accent-foreground: 273 50% 34%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 277 58% 37%;
+    --ring: 273 50% 34%;
 
     --radius: 0.5rem;
 
@@ -67,7 +67,7 @@ All colors MUST be HSL.
     --popover: 240 8% 12%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 277 58% 47%;
+    --primary: 273 50% 34%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 122 55% 28%;
@@ -76,7 +76,7 @@ All colors MUST be HSL.
     --muted: 240 8% 15%;
     --muted-foreground: 240 5% 64%;
 
-    --accent: 277 58% 20%;
+    --accent: 273 50% 20%;
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62% 30%;
@@ -84,7 +84,7 @@ All colors MUST be HSL.
 
     --border: 240 8% 20%;
     --input: 240 8% 20%;
-    --ring: 277 58% 47%;
+    --ring: 273 50% 34%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
