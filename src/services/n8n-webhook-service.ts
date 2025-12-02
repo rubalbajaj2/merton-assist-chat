@@ -19,8 +19,8 @@ export interface N8nImageUpload {
 }
 
 export class N8nWebhookService {
-  private static readonly WEBHOOK_URL = 'https://ask-merti-ai-demo.app.n8n.cloud/webhook/b1c66984-c4cd-426a-a01b-01ac1e44514d/chat';
-  private static readonly SCRAPING_WEBHOOK_URL = 'https://ask-merti-ai-demo.app.n8n.cloud/webhook/fc782015-0ef9-433e-9fb2-e16073658b3c/chat';
+  private static readonly WEBHOOK_URL = 'https://ask-merton.app.n8n.cloud/webhook/b1c66984-c4cd-426a-a01b-01ac1e44514d/chat';
+  private static readonly SCRAPING_WEBHOOK_URL = 'https://ask-merton.app.n8n.cloud/webhook/fc782015-0ef9-433e-9fb2-e16073658b3c/chat';
   private static sessionId: string | null = null;
   private static isInitializing: boolean = false;
 
